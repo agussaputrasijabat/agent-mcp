@@ -164,7 +164,7 @@ function pkcePair() {
 }
 
 function authorize(
-  app: { request: (input: string, init?: RequestInit) => Promise<Response> },
+  app: { request: (input: string, init?: RequestInit) => Response | Promise<Response> },
   baseURL: string,
   redirectUri: string,
   challenge: string,
