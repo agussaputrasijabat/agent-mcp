@@ -2,10 +2,11 @@ import type { Database } from "bun:sqlite";
 import type { Context } from "hono";
 import { requireMcpAuth } from "@better-auth/mcp";
 import { createMcpHonoApp } from "@modelcontextprotocol/hono";
+import { localhostAllowedHostnames, localhostAllowedOrigins } from "@modelcontextprotocol/server";
 import { oauthProviderAuthServerMetadata, verifyOAuthQueryParams } from "@better-auth/oauth-provider";
 import { decideMcpAuth, mcpAuthResponse } from "./auth/mcp-auth.ts";
 import { clientIp, LoginLimiter } from "./auth/login-limit.ts";
-import { createOperatorAuth, mcpResourceUrl, seedOperator, type OperatorAuth } from "./auth/operator.ts";
+import { createOperatorAuth, mcpResourceUrl, seedOperator, serverPort, type OperatorAuth } from "./auth/operator.ts";
 import { ensureSettings, readSettings } from "./db/settings.ts";
 import { consentPage } from "./http/consent-page.ts";
 import { fail, ok } from "./http/json.ts";
@@ -38,6 +39,8 @@ export type AppOptions = {
   baseURL?: string;
   operator?: { email: string; password: string };
   trustProxy?: boolean;
+  allowedHosts?: string;
+  port?: number;
 };
 
 export async function createApp(db: Database, options: AppOptions = {}) {
@@ -49,7 +52,7 @@ export async function createApp(db: Database, options: AppOptions = {}) {
   const envError = operatorEnvError(email, password);
   if (envError) throw new Error(envError);
 
-  const auth = await createOperatorAuth(db, { secret, baseURL });
+  const auth = await createOperatorAuth(db, { secret, baseURL, port: serverPort(options.port) });
   await seedOperator(auth, db, email, password);
   ensureSettings(db, baseURL);
   const resource = mcpResourceUrl(baseURL);
@@ -63,7 +66,8 @@ export async function createApp(db: Database, options: AppOptions = {}) {
   });
   const limiter = new LoginLimiter();
   const trustProxy = options.trustProxy ?? process.env.TRUST_PROXY === "true";
-  const app = createMcpHonoApp({ allowedHosts: ["localhost", "127.0.0.1", new URL(baseURL).hostname] });
+  const hostnames = serverHostnames(baseURL, options.allowedHosts ?? process.env.ALLOWED_HOSTS);
+  const app = createMcpHonoApp({ allowedHosts: hostnames, allowedOrigins: hostnames });
 
   app.get("/health", (c) => {
     db.query("SELECT 1 AS ok").get();
@@ -211,6 +215,27 @@ export async function createApp(db: Database, options: AppOptions = {}) {
   registerDashboard(app, db, operator);
 
   return Object.assign(app, { auth });
+}
+
+function serverHostnames(baseURL: string, extra: string | undefined): string[] {
+  const names = new Set<string>([...localhostAllowedHostnames(), ...localhostAllowedOrigins(), new URL(baseURL).hostname]);
+  for (const part of (extra ?? "").split(",")) {
+    const trimmed = part.trim();
+    if (trimmed.length === 0) continue;
+    names.add(hostnameOf(trimmed));
+  }
+  return [...names];
+}
+
+function hostnameOf(value: string): string {
+  try {
+    const url = value.includes("://") ? new URL(value) : new URL(`http://${value}`);
+    if (url.hostname.length === 0) throw new Error("empty");
+    return url.hostname;
+  } catch (error) {
+    if (error instanceof TypeError) throw new Error("allowed_host_invalid");
+    throw error;
+  }
 }
 
 function readLimit(value: string | undefined): number | "invalid" {

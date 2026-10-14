@@ -208,7 +208,13 @@ async function oauthCode(
   const cookie = login.headers.getSetCookie().map((value) => value.split(";")[0]).join("; ");
   const consent = await app.request("/api/auth/oauth2/consent", {
     method: "POST",
-    headers: { host: "127.0.0.1", "content-type": "application/json", accept: "application/json", cookie },
+    headers: {
+      host: "127.0.0.1",
+      origin: new URL(baseURL).origin,
+      "content-type": "application/json",
+      accept: "application/json",
+      cookie,
+    },
     body: JSON.stringify({ accept, oauth_query: consentUrl.search.slice(1) }),
   });
   const consentBody = (await consent.json()) as { url?: string };

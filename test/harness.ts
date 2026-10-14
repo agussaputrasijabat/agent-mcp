@@ -9,6 +9,7 @@ export function testApp(db: Database, options: AppOptions = {}) {
     secret: testSecret,
     operator: testOperator,
     baseURL: "http://127.0.0.1:3000",
+    allowedHosts: "",
     ...options,
   });
 }

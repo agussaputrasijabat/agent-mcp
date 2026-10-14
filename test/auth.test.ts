@@ -202,6 +202,50 @@ test("mcp requires an api key in the header or query", async () => {
   db.close();
 });
 
+test("loopback sign-in stays trusted beside the public origin", async () => {
+  const db = openDatabase(":memory:");
+  const app = await testApp(db, { baseURL: "https://mcp.example.com", port: 4089 });
+  const body = JSON.stringify(testOperator);
+  const headers = { "content-type": "application/json" };
+
+  const localhost = await app.request("/api/login", {
+    method: "POST",
+    headers: { ...headers, host: "localhost:4089", origin: "http://localhost:4089" },
+    body,
+  });
+  expect(localhost.status).toBe(200);
+
+  const loopback = await app.request("/api/login", {
+    method: "POST",
+    headers: { ...headers, host: "127.0.0.1:4089", origin: "http://127.0.0.1:4089" },
+    body,
+  });
+  expect(loopback.status).toBe(200);
+
+  const published = await app.request("/api/login", {
+    method: "POST",
+    headers: { ...headers, host: "mcp.example.com", origin: "https://mcp.example.com" },
+    body,
+  });
+  expect(published.status).toBe(200);
+
+  const evil = await app.request("/api/login", {
+    method: "POST",
+    headers: { ...headers, host: "127.0.0.1:4089", origin: "https://evil.example" },
+    body,
+  });
+  expect(evil.status).toBe(403);
+  expect(((await evil.json()) as { error: { message: string } }).error.message).toBe("Invalid Origin: evil.example");
+
+  const otherPort = await app.request("/api/login", {
+    method: "POST",
+    headers: { ...headers, host: "localhost:4089", origin: "http://localhost:3000" },
+    body,
+  });
+  expect(otherPort.status).toBe(401);
+  db.close();
+});
+
 test("reset password replaces the operator secret", async () => {
   const db = openDatabase(":memory:");
   const app = await testApp(db);

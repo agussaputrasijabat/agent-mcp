@@ -14,7 +14,7 @@ const databasePath = process.env.DATABASE_PATH ?? "./data/agent.sqlite";
 const db = openDatabase(databasePath);
 let app;
 try {
-  app = await createApp(db);
+  app = await createApp(db, { port });
 } catch (error) {
   if (error instanceof EmptyInstructionsError) process.exit(1);
   const message = error instanceof Error ? error.message : "";
