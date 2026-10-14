@@ -8,6 +8,7 @@ export const webFetchInput = z.object({
 });
 
 type Lookup = (hostname: string) => Promise<string[]>;
+type FetchLike = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
 const defaultLookup: Lookup = async (hostname) => {
   if (isIpLiteral(hostname)) return [hostname];
@@ -17,7 +18,7 @@ const defaultLookup: Lookup = async (hostname) => {
 
 export async function fetchUrl(
   input: z.infer<typeof webFetchInput>,
-  deps: { fetch?: typeof fetch; lookup?: Lookup } = {},
+  deps: { fetch?: FetchLike; lookup?: Lookup } = {},
 ): Promise<ToolResult> {
   let current: URL;
   try {
@@ -36,9 +37,13 @@ export async function fetchUrl(
 
   try {
     for (let hop = 0; hop <= WEB_FETCH_MAX_REDIRECTS; hop += 1) {
-      const blocked = await assertPublic(current, doLookup);
-      if (blocked) return blocked;
-      const response = await doFetch(current, { redirect: "manual", signal: deadline });
+      const resolved = await resolvePublicAddress(current, doLookup);
+      if (typeof resolved !== "string") return resolved;
+      const response = await doFetch(pinnedUrl(current, resolved), {
+        redirect: "manual",
+        signal: deadline,
+        headers: { host: current.host },
+      });
       if (response.status >= 300 && response.status < 400) {
         if (hop === WEB_FETCH_MAX_REDIRECTS) return fail("fetch_failed", "too many redirects");
         const location = response.headers.get("location");
@@ -58,7 +63,7 @@ export async function fetchUrl(
   return fail("fetch_failed", "request failed");
 }
 
-async function assertPublic(url: URL, doLookup: Lookup): Promise<ToolResult | undefined> {
+async function resolvePublicAddress(url: URL, doLookup: Lookup): Promise<string | ToolResult> {
   let addresses: string[];
   try {
     addresses = await doLookup(url.hostname);
@@ -70,7 +75,15 @@ async function assertPublic(url: URL, doLookup: Lookup): Promise<ToolResult | un
   if (addresses.some((address) => isBlockedAddress(address))) {
     return fail("fetch_blocked", "url resolves to a private or loopback address");
   }
-  return undefined;
+  const address = addresses[0];
+  if (!address) return fail("fetch_failed", "dns lookup returned no addresses");
+  return address;
+}
+
+function pinnedUrl(url: URL, address: string): URL {
+  const next = new URL(url.href);
+  next.hostname = address.includes(":") ? `[${address}]` : address;
+  return next;
 }
 
 function isIpLiteral(hostname: string): boolean {
@@ -79,17 +92,47 @@ function isIpLiteral(hostname: string): boolean {
 
 export function isBlockedAddress(address: string): boolean {
   const lower = address.toLowerCase();
-  const mapped = lower.startsWith("::ffff:") ? lower.slice("::ffff:".length) : lower;
-  if (lower === "::1" || mapped === "::1") return true;
+  const ipv4 = ipv4Embedded(lower);
+  if (ipv4) return isBlockedIpv4(ipv4);
+  if (lower === "::1" || lower === "0:0:0:0:0:0:0:1") return true;
   if (/^f[cd]/.test(lower)) return true;
-  const v4 = mapped.includes(".") ? mapped : "";
-  const parts = v4.split(".").map((part) => Number(part));
+  if (isIpv6LinkLocal(lower) || isIpv6Multicast(lower)) return true;
+  return false;
+}
+
+function ipv4Embedded(address: string): string | undefined {
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(address)) return address;
+  const mapped = /^::ffff:(?:0:)?(\d{1,3}(?:\.\d{1,3}){3})$/.exec(address);
+  if (mapped?.[1]) return mapped[1];
+  const compatible = /^::(\d{1,3}(?:\.\d{1,3}){3})$/.exec(address);
+  return compatible?.[1];
+}
+
+function isBlockedIpv4(address: string): boolean {
+  const parts = address.split(".").map((part) => Number(part));
   if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) return false;
   const a = parts[0] ?? 0;
   const b = parts[1] ?? 0;
+  const c = parts[2] ?? 0;
+  const d = parts[3] ?? 0;
+  if (a === 0 && b === 0 && c === 0 && d === 0) return true;
   if (a === 127 || a === 10) return true;
   if (a === 192 && b === 168) return true;
   if (a === 169 && b === 254) return true;
   if (a === 172 && b >= 16 && b <= 31) return true;
   return false;
+}
+
+function isIpv6LinkLocal(address: string): boolean {
+  const first = address.split(":")[0];
+  if (!first || !/^[0-9a-f]{1,4}$/.test(first)) return false;
+  const value = Number.parseInt(first, 16);
+  return value >= 0xfe80 && value <= 0xfebf;
+}
+
+function isIpv6Multicast(address: string): boolean {
+  const first = address.split(":")[0];
+  if (!first || !/^[0-9a-f]{1,4}$/.test(first)) return false;
+  const value = Number.parseInt(first, 16);
+  return value >= 0xff00 && value <= 0xffff;
 }

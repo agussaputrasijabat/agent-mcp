@@ -35,6 +35,7 @@ test("login rejects a bad password and accepts the operator", async () => {
 test("login locks an address after ten failures", async () => {
   const db = openDatabase(":memory:");
   const app = await testApp(db);
+  // app.request() has no socket, so clientIp is 127.0.0.1 for this in-process client.
   for (let attempt = 0; attempt < 10; attempt += 1) {
     const response = await app.request("/api/login", {
       method: "POST",
@@ -49,6 +50,95 @@ test("login locks an address after ten failures", async () => {
     body: JSON.stringify(testOperator),
   });
   expect(blocked.status).toBe(429);
+  db.close();
+});
+
+
+test("native email sign-in locks an address after ten failures", async () => {
+  const db = openDatabase(":memory:");
+  const app = await testApp(db);
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const response = await app.request("/api/auth/sign-in/email", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ email: testOperator.email, password: "not-the-password" }),
+    });
+    expect(response.status).toBe(401);
+  }
+  const blocked = await app.request("/api/auth/sign-in/email", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ email: testOperator.email, password: "not-the-password" }),
+  });
+  expect(blocked.status).toBe(429);
+  db.close();
+});
+
+test("trusted proxy lockout uses the rightmost forwarded address", async () => {
+  const db = openDatabase(":memory:");
+  const app = await testApp(db, { trustProxy: true });
+  const locked = { ...headers, "x-forwarded-for": "203.0.113.9, 198.51.100.4" };
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const response = await app.request("/api/login", {
+      method: "POST",
+      headers: locked,
+      body: JSON.stringify({ email: testOperator.email, password: "not-the-password" }),
+    });
+    expect(response.status).toBe(401);
+  }
+  const blocked = await app.request("/api/login", {
+    method: "POST",
+    headers: locked,
+    body: JSON.stringify(testOperator),
+  });
+  expect(blocked.status).toBe(429);
+  const other = await app.request("/api/login", {
+    method: "POST",
+    headers: { ...headers, "x-forwarded-for": "203.0.113.9, 198.51.100.8" },
+    body: JSON.stringify(testOperator),
+  });
+  expect(other.status).toBe(200);
+  db.close();
+});
+
+test("login lockout follows the socket address when the proxy is not trusted", async () => {
+  const db = openDatabase(":memory:");
+  const app = await testApp(db, { trustProxy: false });
+  const peer = (address: string) => ({
+    requestIP: () => ({ address, family: "IPv4" as const, port: 1 }),
+  });
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const response = await app.request(
+      "/api/login",
+      {
+        method: "POST",
+        headers: { ...headers, "x-forwarded-for": "203.0.113.9" },
+        body: JSON.stringify({ email: testOperator.email, password: "not-the-password" }),
+      },
+      peer("203.0.113.10"),
+    );
+    expect(response.status).toBe(401);
+  }
+  const blocked = await app.request(
+    "/api/login",
+    {
+      method: "POST",
+      headers: { ...headers, "x-forwarded-for": "198.51.100.8" },
+      body: JSON.stringify(testOperator),
+    },
+    peer("203.0.113.10"),
+  );
+  expect(blocked.status).toBe(429);
+  const other = await app.request(
+    "/api/login",
+    {
+      method: "POST",
+      headers: { ...headers, "x-forwarded-for": "203.0.113.9" },
+      body: JSON.stringify(testOperator),
+    },
+    peer("203.0.113.11"),
+  );
+  expect(other.status).toBe(200);
   db.close();
 });
 

@@ -2,12 +2,10 @@ import { cimd } from "@better-auth/cimd";
 import { fetchClientMetadataResource } from "@better-auth/cimd/node";
 import { mcp } from "@better-auth/mcp";
 import { APIError } from "better-auth/api";
-import { betterAuth, type Auth } from "better-auth";
+import { betterAuth } from "better-auth";
 import { getMigrations } from "better-auth/db/migration";
 import { jwt } from "better-auth/plugins";
 import type { Database } from "bun:sqlite";
-
-export type OperatorAuth = Auth;
 
 const hour = 60 * 60;
 const day = 24 * hour;
@@ -18,7 +16,7 @@ export function mcpResourceUrl(baseURL: string): string {
   return `${baseURL.replace(/\/$/, "")}/mcp`;
 }
 
-export async function createOperatorAuth(db: Database, options: { secret: string; baseURL: string }): Promise<OperatorAuth> {
+export async function createOperatorAuth(db: Database, options: { secret: string; baseURL: string }) {
   const config = {
     database: db,
     secret: options.secret,
@@ -59,6 +57,8 @@ export async function createOperatorAuth(db: Database, options: { secret: string
   if (ctx.checkSchema) await ctx.checkSchema();
   return auth;
 }
+
+export type OperatorAuth = Awaited<ReturnType<typeof createOperatorAuth>>;
 
 export async function seedOperator(auth: OperatorAuth, db: Database, email: string, password: string): Promise<void> {
   const existing = db.query("SELECT id FROM user WHERE email = ?").get(email) as { id: string } | null;

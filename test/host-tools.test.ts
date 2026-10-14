@@ -151,33 +151,67 @@ test("two shells run at the same time", async () => {
 test("web_fetch blocks private addresses and returns http status", async () => {
   expect(isBlockedAddress("127.0.0.1")).toBe(true);
   expect(isBlockedAddress("10.1.2.3")).toBe(true);
+  expect(isBlockedAddress("0.0.0.0")).toBe(true);
+  expect(isBlockedAddress("fe80::1")).toBe(true);
+  expect(isBlockedAddress("ff02::1")).toBe(true);
+  expect(isBlockedAddress("::ffff:0:127.0.0.1")).toBe(true);
+  expect(isBlockedAddress("::127.0.0.1")).toBe(true);
   expect(isBlockedAddress("8.8.8.8")).toBe(false);
-  const blocked = await fetchUrl({ url: "http://127.0.0.1/" });
+  const blocked = await fetchUrl(
+    { url: "http://127.0.0.1/" },
+    { fetch: async () => { throw new Error("fetched private"); } },
+  );
   expect(blocked.content[0].text.startsWith("error fetch_blocked:")).toBe(true);
+  const seen: { href: string; host: string | null }[] = [];
   const missing = await fetchUrl(
     { url: "https://example.test/missing" },
     {
       lookup: async () => ["8.8.8.8"],
-      fetch: async () => new Response("gone", { status: 404 }),
+      fetch: async (input, init) => {
+        seen.push(calledFetch(input, init));
+        return new Response("gone", { status: 404 });
+      },
     },
   );
   expect(missing.isError).toBeUndefined();
   expect(missing.content[0].text).toContain("status 404");
+  expect(seen[0]?.href).toBe("https://8.8.8.8/missing");
+  expect(seen[0]?.host).toBe("example.test");
+  const okSeen: { href: string; host: string | null }[] = [];
   const okResult = await fetchUrl(
     { url: "https://example.com/hello" },
     {
       lookup: async () => ["8.8.8.8"],
-      fetch: async () => new Response("hello", { status: 200 }),
+      fetch: async (input, init) => {
+        okSeen.push(calledFetch(input, init));
+        return new Response("hello", { status: 200 });
+      },
     },
   );
   expect(okResult.content[0].text).toContain("status 200");
   expect(okResult.content[0].text).toContain("hello");
+  expect(okSeen[0]?.href).toBe("https://8.8.8.8/hello");
+  expect(okSeen[0]?.host).toBe("example.com");
+  const rebound = await fetchUrl(
+    { url: "https://example.com/go" },
+    {
+      lookup: async (hostname) => (hostname === "127.0.0.1" ? ["127.0.0.1"] : ["8.8.8.8"]),
+      fetch: async () => new Response(null, { status: 302, headers: { location: "http://127.0.0.1/secret" } }),
+    },
+  );
+  expect(rebound.content[0].text.startsWith("error fetch_blocked:")).toBe(true);
   const failed = await fetchUrl(
     { url: "https://missing.example/" },
     { lookup: async () => { throw new Error("no dns"); } },
   );
   expect(failed.content[0].text.startsWith("error fetch_failed:")).toBe(true);
 });
+
+function calledFetch(input: string | URL | Request, init?: RequestInit): { href: string; host: string | null } {
+  const href = input instanceof URL ? input.href : input instanceof Request ? input.url : input;
+  const host = new Headers(input instanceof Request ? input.headers : init?.headers).get("host");
+  return { href, host };
+}
 
 test("tools/list exposes seven host tools and instructions", async () => {
   const db = openDatabase(":memory:");

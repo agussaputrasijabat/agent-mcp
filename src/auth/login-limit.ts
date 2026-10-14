@@ -1,3 +1,6 @@
+import type { Context } from "hono";
+import { getConnInfo } from "hono/bun";
+
 export class LoginLimiter {
   private readonly failures = new Map<string, number[]>();
 
@@ -19,10 +22,29 @@ export class LoginLimiter {
   }
 }
 
-export function clientIp(request: Request, trustProxy: boolean): string {
+export function clientIp(c: Context, trustProxy: boolean): string {
   if (trustProxy) {
-    const forwarded = request.headers.get("x-forwarded-for");
-    if (forwarded) return forwarded.split(",")[0]?.trim() || "local";
+    const forwarded = c.req.header("x-forwarded-for");
+    if (forwarded) {
+      const appended = forwarded
+        .split(",")
+        .map((part) => part.trim())
+        .filter((part) => part.length > 0)
+        .at(-1);
+      if (appended) return appended;
+    }
   }
-  return "local";
+  // No Bun socket on Hono app.request(). That in-process client is 127.0.0.1.
+  // Bun.serve supplies requestIP, so internet clients are not one shared key.
+  return remoteAddress(c) ?? "127.0.0.1";
+}
+
+function remoteAddress(c: Context): string | undefined {
+  try {
+    const address = getConnInfo(c).remote.address?.trim();
+    return address ? address : undefined;
+  } catch (error) {
+    if (error instanceof TypeError) return undefined;
+    throw error;
+  }
 }

@@ -63,13 +63,20 @@ export async function createApp(db: Database, options: AppOptions = {}) {
     const valid = query.length > 0 && (await verifyOAuthQueryParams(query, secret));
     return c.html(consentPage({ valid, clientId: params.get("client_id") ?? "", scope: params.get("scope") ?? "" }));
   });
-  app.on(["GET", "POST"], "/api/auth/*", (c) => auth.handler(c.req.raw));
+  app.on(["GET", "POST"], "/api/auth/*", async (c) => {
+    const emailSignIn = c.req.method === "POST" && new URL(c.req.url).pathname === "/api/auth/sign-in/email";
+    const ip = clientIp(c, trustProxy);
+    if (emailSignIn && limiter.tooMany(ip)) return fail(c, 429, "rate_limited", "Too many sign-in attempts");
+    const response = await auth.handler(c.req.raw);
+    if (emailSignIn && !response.ok) limiter.recordFailure(ip);
+    return response;
+  });
   app.get("/.well-known/oauth-authorization-server", (c) => oauthProviderAuthServerMetadata(auth)(c.req.raw));
   app.on(["GET", "HEAD"], "/.well-known/oauth-protected-resource", (c) => auth.handler(c.req.raw));
   app.on(["GET", "HEAD"], "/.well-known/oauth-protected-resource/mcp", (c) => auth.handler(c.req.raw));
 
   app.post("/api/login", async (c) => {
-    const ip = clientIp(c.req.raw, trustProxy);
+    const ip = clientIp(c, trustProxy);
     if (limiter.tooMany(ip)) return fail(c, 429, "rate_limited", "Too many sign-in attempts");
     const body = await c.req.json().catch(() => null) as { email?: string; password?: string; oauth_query?: string } | null;
     const response = await auth.api.signInEmail({

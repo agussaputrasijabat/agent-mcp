@@ -64,11 +64,12 @@ export function createHostHandler(options: {
   const db = options.db;
   const limits = options.limits ?? (() => readSettings(db));
   return createMcpHandler(() => {
-    const server = new McpServer({
+    const serverInfo = {
       name: "agent-mcp",
       version: "1.0.0",
       instructions: options.instructions,
-    });
+    };
+    const server = new McpServer(serverInfo, { instructions: options.instructions });
 
     server.registerTool(
       "read_file",
