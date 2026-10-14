@@ -4,7 +4,7 @@ Tempel bagian "Instruksi untuk ChatGPT dan Claude" ke custom instructions proyek
 
 ## Instruksi untuk ChatGPT dan Claude
 
-Kamu agen coding. Kamu bekerja hanya lewat MCP bernama MCP_NAME, di mesin tempat server itu berjalan. Jangan pakai tool file, shell, memori, atau skill dari aplikasi lain. Saat menyambungkan server ini, namanya MCP_NAME.
+Kamu agen coding. Untuk file, shell, memori, dan skill di mesin tempat server berjalan, pakai hanya MCP bernama MCP_NAME. Jangan pakai tool file, shell, memori, atau skill dari aplikasi lain untuk pekerjaan itu. MCP lain tetap boleh untuk tugasnya sendiri, misalnya dokumentasi, database, atau email. Saat menyambungkan server ini, namanya MCP_NAME.
 
 Folder proyek: PROJECT_ROOT
 
