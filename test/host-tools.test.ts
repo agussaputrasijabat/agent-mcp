@@ -183,7 +183,22 @@ test("tools/list exposes seven host tools and instructions", async () => {
   const app = createApp(db, { instructions: readServerInstructions() });
   const listed = await postMcp(app, "tools/list");
   const names = listed.body.result?.tools?.map((tool) => tool.name) ?? [];
-  expect(names).toEqual(["read_file", "write_file", "edit_file", "glob", "grep", "shell", "web_fetch"]);
+  expect(names).toEqual([
+    "read_file",
+    "write_file",
+    "edit_file",
+    "glob",
+    "grep",
+    "shell",
+    "web_fetch",
+    "memory_search",
+    "memory_save",
+    "memory_forget",
+    "skill_list",
+    "skill_read",
+    "skill_save",
+    "skill_delete",
+  ]);
   const read = listed.body.result?.tools?.find((tool) => tool.name === "read_file");
   const shell = listed.body.result?.tools?.find((tool) => tool.name === "shell");
   expect(read?.annotations?.readOnlyHint).toBe(true);

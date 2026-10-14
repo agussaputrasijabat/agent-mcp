@@ -1,4 +1,5 @@
 import { createMcpHandler, McpServer } from "@modelcontextprotocol/server";
+import type { Database } from "bun:sqlite";
 import { SHELL_CONCURRENCY } from "../limits.ts";
 import {
   editFile,
@@ -12,14 +13,49 @@ import {
   writeFile,
   writeFileInput,
 } from "../tools/files.ts";
+import {
+  memoryForget,
+  memoryForgetInput,
+  memorySave,
+  memorySaveInput,
+  memorySearch,
+  memorySearchInput,
+} from "../tools/memory.ts";
 import { runShell, ShellGate, shellInput } from "../tools/shell.ts";
+import {
+  skillDelete,
+  skillDeleteInput,
+  skillList,
+  skillRead,
+  skillReadInput,
+  skillSave,
+  skillSaveInput,
+} from "../tools/skills.ts";
 import { fetchUrl, webFetchInput } from "../tools/web-fetch.ts";
 
 const readOnly = { readOnlyHint: true } as const;
-const writeAnnotations = { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false } as const;
+const writeAnnotations = {
+  readOnlyHint: false,
+  destructiveHint: true,
+  idempotentHint: false,
+  openWorldHint: false,
+} as const;
+const upsertAnnotations = {
+  readOnlyHint: false,
+  destructiveHint: false,
+  idempotentHint: true,
+  openWorldHint: false,
+} as const;
+const deleteAnnotations = {
+  readOnlyHint: false,
+  destructiveHint: true,
+  idempotentHint: true,
+  openWorldHint: false,
+} as const;
 
-export function createHostHandler(options: { instructions: string; shellConcurrency?: number }) {
+export function createHostHandler(options: { db: Database; instructions: string; shellConcurrency?: number }) {
   const gate = new ShellGate(options.shellConcurrency ?? SHELL_CONCURRENCY);
+  const db = options.db;
   return createMcpHandler(() => {
     const server = new McpServer({
       name: "agent-mcp",
@@ -34,7 +70,11 @@ export function createHostHandler(options: { instructions: string; shellConcurre
     );
     server.registerTool(
       "write_file",
-      { description: "Create or replace a UTF-8 file at an absolute path.", inputSchema: writeFileInput, annotations: writeAnnotations },
+      {
+        description: "Create or replace a UTF-8 file at an absolute path.",
+        inputSchema: writeFileInput,
+        annotations: writeAnnotations,
+      },
       async (input) => writeFile(input),
     );
     server.registerTool(
@@ -69,6 +109,39 @@ export function createHostHandler(options: { instructions: string; shellConcurre
         annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
       },
       async (input) => fetchUrl(input),
+    );
+    server.registerTool(
+      "memory_search",
+      { description: "Find saved notes by text.", inputSchema: memorySearchInput, annotations: readOnly },
+      async (input) => memorySearch(db, input),
+    );
+    server.registerTool(
+      "memory_save",
+      { description: "Create or replace a note.", inputSchema: memorySaveInput, annotations: upsertAnnotations },
+      async (input) => memorySave(db, input),
+    );
+    server.registerTool(
+      "memory_forget",
+      { description: "Delete one note by key.", inputSchema: memoryForgetInput, annotations: deleteAnnotations },
+      async (input) => memoryForget(db, input),
+    );
+    server.registerTool("skill_list", { description: "List skill names and descriptions.", annotations: readOnly }, async () =>
+      skillList(db),
+    );
+    server.registerTool(
+      "skill_read",
+      { description: "Read one skill body.", inputSchema: skillReadInput, annotations: readOnly },
+      async (input) => skillRead(db, input),
+    );
+    server.registerTool(
+      "skill_save",
+      { description: "Create or replace a skill.", inputSchema: skillSaveInput, annotations: upsertAnnotations },
+      async (input) => skillSave(db, input),
+    );
+    server.registerTool(
+      "skill_delete",
+      { description: "Delete one skill by name.", inputSchema: skillDeleteInput, annotations: deleteAnnotations },
+      async (input) => skillDelete(db, input),
     );
     return server;
   });

@@ -10,7 +10,11 @@ export type AppOptions = {
 
 export function createApp(db: Database, options: AppOptions = {}) {
   const instructions = assertInstructions(options.instructions ?? readServerInstructions());
-  const handler = createHostHandler({ instructions, shellConcurrency: options.shellConcurrency });
+  const handler = createHostHandler({
+    db,
+    instructions,
+    shellConcurrency: options.shellConcurrency,
+  });
   const app = createMcpHonoApp({
     allowedHosts: ["localhost", "127.0.0.1"],
   });
