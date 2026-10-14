@@ -1,9 +1,10 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, test } from "bun:test";
 import { memoryForget, memorySave, memorySearch } from "../src/tools/memory.ts";
 import { browseSkill, previousBrowseBody } from "../src/tools/browse-skill.ts";
+import { eccSkillNames, loadEccSkills } from "../src/tools/ecc-skills.ts";
 import { planSkill, previousPlanBody } from "../src/tools/plan-skill.ts";
 import { skillDelete, skillList, skillRead, skillSave } from "../src/tools/skills.ts";
 import { openDatabase } from "../src/db/database.ts";
@@ -54,8 +55,10 @@ test("skills list descriptions, replace bodies, and delete", () => {
   expect(skillRead(db, { name: "missing" }).content[0].text.startsWith("error not_found:")).toBe(true);
   expect(skillDelete(db, { name: "review" }).isError).toBeUndefined();
   expect(skillRead(db, { name: "review" }).content[0].text.startsWith("error not_found:")).toBe(true);
-  for (let index = 0; index < 200; index += 1) {
-    skillSave(db, { name: `skill-${index}`, description: "extra", body: "body" });
+  const seeded = (db.query("SELECT COUNT(*) AS count FROM skills").get() as { count: number }).count;
+  const room = 200 - seeded;
+  for (let index = 0; index < room; index += 1) {
+    expect(skillSave(db, { name: `skill-${index}`, description: "extra", body: "body" }).isError).toBeUndefined();
   }
   expect(skillSave(db, { name: "one-more", description: "extra", body: "body" }).content[0].text.startsWith("error skill_limit:")).toBe(true);
   db.close();
@@ -292,6 +295,62 @@ test("repo skill list sees a description edit", () => {
   expect(listed).toContain("Fresh description");
   expect(listed).not.toContain("Old description");
   db.close();
+});
+
+test("fresh database includes ecc reviewer skills and keeps a custom body", () => {
+  const skills = loadEccSkills();
+  expect(skills.map((skill) => skill.name)).toEqual([...eccSkillNames]);
+  expect(skills).toHaveLength(32);
+  for (const skill of skills) {
+    expect(skill.description.length).toBeGreaterThanOrEqual(1);
+    expect(skill.description.length).toBeLessThanOrEqual(200);
+    expect(skill.description.includes("\n")).toBe(false);
+    expect(skill.description.includes("\r")).toBe(false);
+    expect(skill.body.length).toBeLessThanOrEqual(32_000);
+    expect(skill.body).toContain("read_file");
+    expect(skill.body).toContain("## Prompt Defense Baseline");
+    expect(skill.body.startsWith("---")).toBe(false);
+  }
+  const typescript = skills.find((skill) => skill.name === "typescript-reviewer");
+  expect(typescript?.description).toContain("MUST BE USED");
+  expect(typescript?.body).toContain("Non-null assertion abuse");
+  expect(typescript?.body).not.toContain("model: sonnet");
+  const hunter = skills.find((skill) => skill.name === "silent-failure-hunter");
+  expect(hunter?.body).toContain("You have zero tolerance for silent failures.");
+  expect(hunter?.body).not.toContain("model: sonnet");
+
+  const path = fileDatabase();
+  const first = openDatabase(path);
+  const names = new Set((first.query("SELECT name FROM skills").all() as { name: string }[]).map((row) => row.name));
+  expect(names.has("plan")).toBe(true);
+  expect(names.has("browse")).toBe(true);
+  for (const name of eccSkillNames) expect(names.has(name)).toBe(true);
+  expect(skillRead(first, { name: "typescript-reviewer" }).content[0].text).toBe(typescript?.body);
+
+  const customBody = "Review kustom yang tidak boleh ditimpa.";
+  expect(
+    skillSave(first, { name: "typescript-reviewer", description: "Catatan lokal", body: customBody }).isError,
+  ).toBeUndefined();
+  first.close();
+
+  const second = openDatabase(path);
+  expect(skillRead(second, { name: "typescript-reviewer" }).content[0].text).toBe(customBody);
+  const row = second.query("SELECT description FROM skills WHERE name = ?").get("typescript-reviewer") as {
+    description: string;
+  };
+  expect(row.description).toBe("Catatan lokal");
+  second.close();
+});
+
+test("ecc description drops one pair of wrapping quotes", () => {
+  const directory = mkdtempSync(join(tmpdir(), "agent-mcp-ecc-"));
+  directories.push(directory);
+  cpSync(join(import.meta.dir, "../skills/ecc"), directory, { recursive: true });
+  const file = join(directory, "comment-analyzer.md");
+  const original = "Analyze code comments for accuracy, completeness, maintainability, and comment rot risk.";
+  writeFileSync(file, readFileSync(file, "utf8").replace(`description: ${original}`, `description: "${original}"`));
+  const skill = loadEccSkills(directory).find((item) => item.name === "comment-analyzer");
+  expect(skill?.description).toBe(original);
 });
 
 function writeSkillDir(root: string, folder: string, name: string, body: string, description: string) {
