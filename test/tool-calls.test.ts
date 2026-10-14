@@ -93,14 +93,13 @@ test("tool_calls stores a finished read and redacts the live secret", async () =
   const secondBody = (await second.json()) as { data: { items: { session_key: string }[] } };
   expect(secondBody.data.items.some((item) => item.session_key === firstBody.data.items[0]?.session_key)).toBe(false);
 
-  const feed = await app.request("/", { headers: { host: "127.0.0.1", cookie } });
-  const html = await feed.text();
-  expect(html).toContain("Belum ada panggilan tool.");
-  expect(html).toContain("Feed gagal dimuat.");
-  expect(html).toContain("Coba lagi");
-  expect(html).toContain("1000");
-  const missing = await app.request("/sessions/tidak-ada", { headers: { host: "127.0.0.1", cookie } });
-  expect(await missing.text()).toContain("Sesi ini tidak punya panggilan.");
+  const feedSource = await Bun.file(new URL("../web/src/feed.tsx", import.meta.url)).text();
+  expect(feedSource).toContain("Belum ada panggilan tool.");
+  expect(feedSource).toContain("Feed gagal dimuat.");
+  expect(feedSource).toContain("Coba lagi");
+  expect(feedSource).toContain("1000");
+  const sessionSource = await Bun.file(new URL("../web/src/sessions.tsx", import.meta.url)).text();
+  expect(sessionSource).toContain("Sesi ini tidak punya panggilan.");
   rmSync(directory, { recursive: true, force: true });
   db.close();
 });
@@ -118,7 +117,7 @@ test("tool_calls keeps an unfinished row after the database reopens", () => {
   rmSync(directory, { recursive: true, force: true });
 });
 
-async function signIn(app: { request: (input: string, init?: RequestInit) => Promise<Response> }) {
+async function signIn(app: { request: (input: string, init?: RequestInit) => Promise<Response> | Response }) {
   const response = await app.request("/api/login", {
     method: "POST",
     headers: { host: "127.0.0.1", "content-type": "application/json" },

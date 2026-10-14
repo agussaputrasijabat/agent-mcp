@@ -104,7 +104,7 @@ test("operator routes manage keys, clients, settings, memory, and skills", async
   db.close();
 });
 
-async function signIn(app: { request: (input: string, init?: RequestInit) => Promise<Response> }) {
+async function signIn(app: { request: (input: string, init?: RequestInit) => Promise<Response> | Response }) {
   const response = await app.request("/api/login", {
     method: "POST",
     headers: { host: "127.0.0.1", "content-type": "application/json" },

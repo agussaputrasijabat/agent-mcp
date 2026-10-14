@@ -67,7 +67,7 @@ function traced<T>(db: Database, name: string, args: T, ctx: ToolMeta, run: () =
     })
     .catch((error: unknown) => {
       const message = error instanceof Error ? error.message : "tool failed";
-      finishToolCall(db, id, { content: [{ type: "text", text: message }], isError: true }, Date.now() - started);
+      finishToolCall(db, id, { content: [{ text: message }], isError: true }, Date.now() - started);
       throw error;
     });
 }

@@ -1,5 +1,5 @@
 import { EmptyInstructionsError } from "./mcp/instructions.ts";
-import { createApp } from "./app.ts";
+import { createApp, MIN_OPERATOR_PASSWORD_LENGTH } from "./app.ts";
 import { openDatabase } from "./db/database.ts";
 
 const host = process.env.HOST ?? "127.0.0.1";
@@ -18,7 +18,11 @@ try {
 } catch (error) {
   if (error instanceof EmptyInstructionsError) process.exit(1);
   const message = error instanceof Error ? error.message : "";
-  if (message === "operator_env_missing" || message === "auth_secret_missing") {
+  if (message === "password_too_short") {
+    console.error(JSON.stringify({ level: "error", msg: message, min: MIN_OPERATOR_PASSWORD_LENGTH }));
+    process.exit(1);
+  }
+  if (message === "operator_env_missing" || message === "auth_secret_missing" || message === "database_path_not_writable") {
     console.error(JSON.stringify({ level: "error", msg: message }));
     process.exit(1);
   }

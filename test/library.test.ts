@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, test } from "bun:test";
 import { memoryForget, memorySave, memorySearch } from "../src/tools/memory.ts";
+import { planSkill } from "../src/tools/plan-skill.ts";
 import { skillDelete, skillList, skillRead, skillSave } from "../src/tools/skills.ts";
 import { openDatabase } from "../src/db/database.ts";
 
@@ -57,4 +58,40 @@ test("skills list descriptions, replace bodies, and delete", () => {
   }
   expect(skillSave(db, { name: "one-more", description: "extra", body: "body" }).content[0].text.startsWith("error skill_limit:")).toBe(true);
   db.close();
+});
+
+test("fresh database includes plan and keeps a saved plan", () => {
+  const path = fileDatabase();
+  const first = openDatabase(path);
+  const listed = skillList(first).content[0].text;
+  const line = listed.split("\n").find((row) => row.startsWith("plan\t"));
+  expect(line).toBeDefined();
+  expect(line).toContain(planSkill.description);
+  expect(line).not.toContain("Balas GO untuk mulai");
+  expect(planSkill.description.length).toBeLessThanOrEqual(200);
+  expect(planSkill.description.includes("\n")).toBe(false);
+  expect(planSkill.body.length).toBeLessThanOrEqual(32_000);
+  expect(skillRead(first, { name: "plan" }).content[0].text).toBe(planSkill.body);
+
+  const customBody = "Rencana kustom yang tidak boleh ditimpa.";
+  expect(skillSave(first, { name: "plan", description: "Catatan lokal", body: customBody }).isError).toBeUndefined();
+  const saved = first.query("SELECT description, body, updated_at FROM skills WHERE name = ?").get("plan") as {
+    description: string;
+    body: string;
+    updated_at: string;
+  };
+  first.close();
+
+  const second = openDatabase(path);
+  const again = second.query("SELECT description, body, updated_at FROM skills WHERE name = ?").get("plan") as {
+    description: string;
+    body: string;
+    updated_at: string;
+  };
+  expect(again).toEqual(saved);
+  const listedAgain = skillList(second).content[0].text.split("\n").find((row) => row.startsWith("plan\t"));
+  expect(listedAgain).toContain("Catatan lokal");
+  expect(listedAgain).not.toContain(planSkill.body);
+  expect(skillRead(second, { name: "plan" }).content[0].text).toBe(customBody);
+  second.close();
 });

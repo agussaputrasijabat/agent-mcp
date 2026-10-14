@@ -9,11 +9,8 @@ import { createOperatorAuth, mcpResourceUrl, seedOperator, type OperatorAuth } f
 import { ensureSettings, readSettings } from "./db/settings.ts";
 import { consentPage } from "./http/consent-page.ts";
 import { fail, ok } from "./http/json.ts";
-import { loginPage } from "./http/login-page.ts";
 import { decodeCursor, getToolCall, listSessions, listToolCalls } from "./db/tool-calls.ts";
-import { registerDashboard } from "./http/dashboard.ts";
-import { feedPage } from "./http/feed-page.ts";
-import { sessionDetailPage, sessionsPage } from "./http/sessions-page.ts";
+import { dashboardPage, registerDashboard } from "./http/dashboard.ts";
 import { createHostHandler } from "./mcp/handler.ts";
 import { runMcpRequest } from "./mcp/request-context.ts";
 import { assertInstructions, readServerInstructions } from "./mcp/instructions.ts";
@@ -22,6 +19,16 @@ declare module "hono" {
   interface ContextVariableMap {
     parsedBody: unknown;
   }
+}
+
+export const MIN_OPERATOR_PASSWORD_LENGTH = 12;
+
+export type OperatorEnvError = "operator_env_missing" | "password_too_short";
+
+export function operatorEnvError(email: string, password: string): OperatorEnvError | null {
+  if (!email || password.length === 0) return "operator_env_missing";
+  if (password.length < MIN_OPERATOR_PASSWORD_LENGTH) return "password_too_short";
+  return null;
 }
 
 export type AppOptions = {
@@ -39,7 +46,8 @@ export async function createApp(db: Database, options: AppOptions = {}) {
   const baseURL = options.baseURL ?? process.env.PUBLIC_BASE_URL ?? "http://127.0.0.1:3000";
   const email = options.operator?.email ?? process.env.DASHBOARD_EMAIL ?? "";
   const password = options.operator?.password ?? process.env.DASHBOARD_PASSWORD ?? "";
-  if (!email || password.length < 12) throw new Error("operator_env_missing");
+  const envError = operatorEnvError(email, password);
+  if (envError) throw new Error(envError);
 
   const auth = await createOperatorAuth(db, { secret, baseURL });
   await seedOperator(auth, db, email, password);
@@ -62,7 +70,7 @@ export async function createApp(db: Database, options: AppOptions = {}) {
     return c.json({ data: { ok: true }, error: null });
   });
 
-  app.get("/login", (c) => c.html(loginPage()));
+  app.get("/login", () => dashboardPage());
   app.get("/consent", async (c) => {
     const query = new URL(c.req.url).search.slice(1);
     const params = new URLSearchParams(query);
@@ -161,19 +169,17 @@ export async function createApp(db: Database, options: AppOptions = {}) {
 
   app.get("/", async (c) => {
     if (!(await operator(c))) return c.redirect("/login");
-    return c.html(feedPage());
+    return dashboardPage();
   });
 
   app.get("/sessions", async (c) => {
     if (!(await operator(c))) return c.redirect("/login");
-    return c.html(sessionsPage(listSessions(db, { limit: 50 }).items));
+    return dashboardPage();
   });
 
   app.get("/sessions/:sessionKey", async (c) => {
     if (!(await operator(c))) return c.redirect("/login");
-    const sessionKey = c.req.param("sessionKey");
-    const calls = listToolCalls(db, { limit: 100, sessionKey }).items;
-    return c.html(sessionDetailPage(sessionKey, calls));
+    return dashboardPage();
   });
 
   app.all("/mcp", (c) => {

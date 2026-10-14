@@ -159,15 +159,18 @@ export function registerDashboard(app: Hono, db: Database, operator: OperatorChe
 
   const page = async (c: Context) => {
     if (!(await operator(c))) return c.redirect("/login");
-    const file = Bun.file(join(root, "dist/web/index.html"));
-    if (!(await file.exists())) return new Response("Dashboard build is missing", { status: 500 });
-    return new Response(file, { headers: { "content-type": "text/html; charset=utf-8" } });
+    return dashboardPage();
   };
 
   for (const path of ["/keys", "/clients", "/settings", "/memories", "/skills", "/skills/new"]) {
     app.get(path, page);
   }
   app.get("/skills/:name", page);
+  app.get("/favicon.svg", () => {
+    return new Response(Bun.file(join(root, "web/public/favicon.svg")), {
+      headers: { "content-type": "image/svg+xml; charset=utf-8" },
+    });
+  });
   app.get("/assets/*", async (c) => {
     const name = c.req.path.slice("/assets/".length);
     if (name.includes("..") || name.includes("/")) return new Response("Not found", { status: 404 });
@@ -175,6 +178,12 @@ export function registerDashboard(app: Hono, db: Database, operator: OperatorChe
     if (!(await file.exists())) return new Response("Not found", { status: 404 });
     return new Response(file);
   });
+}
+
+export async function dashboardPage(): Promise<Response> {
+  const file = Bun.file(join(root, "dist/web/index.html"));
+  if (!(await file.exists())) return new Response("Dashboard build is missing", { status: 500 });
+  return new Response(file, { headers: { "content-type": "text/html; charset=utf-8" } });
 }
 
 function publicKey(row: { id: string; name: string; key_prefix: string; created_at: string; last_used_at: string | null; revoked_at: string | null }) {

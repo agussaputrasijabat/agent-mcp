@@ -1,5 +1,6 @@
 import type { Database } from "bun:sqlite";
 import * as z from "zod/v4";
+import { planSkill } from "./plan-skill.ts";
 import { fail, ok, type ToolResult } from "./result.ts";
 import { isValidName } from "./names.ts";
 
@@ -17,6 +18,21 @@ export const skillSaveInput = z.object({
 
 type SkillListRow = { name: string; description: string; updated_at: string };
 type SkillRow = SkillListRow & { body: string };
+
+export function seedPlanSkill(db: Database): void {
+  if (planSkill.description.length < 1 || planSkill.description.length > SKILL_DESCRIPTION_LIMIT) {
+    throw new Error("plan_description_invalid");
+  }
+  if (planSkill.body.length < 1 || planSkill.body.length > SKILL_BODY_LIMIT) {
+    throw new Error("plan_body_invalid");
+  }
+  const now = new Date().toISOString();
+  db.query(
+    `INSERT INTO skills (id, name, description, body, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT(name) DO NOTHING`,
+  ).run(crypto.randomUUID(), planSkill.name, planSkill.description, planSkill.body, now, now);
+}
 
 export function skillList(db: Database): ToolResult {
   const rows = db

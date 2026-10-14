@@ -1,6 +1,13 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { api } from "./api.ts";
-import { Failed, Loading, buttonClass, fieldClass } from "./shell.tsx";
+import { EmptyState, Failed, LoadingRows } from "./shell.tsx";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
 
 type KeyRow = {
   id: string;
@@ -58,41 +65,63 @@ export function KeysPage() {
   }
 
   return (
-    <div>
-      <h1 className="mt-0">Kunci API</h1>
-      <form className="mb-6 flex gap-3" onSubmit={create}>
-        <input className={fieldClass} value={name} onChange={(event) => setName(event.target.value)} placeholder="nama" />
-        <button className={buttonClass} type="submit">Buat</button>
-      </form>
+    <div className="flex flex-col gap-4">
+      <Card>
+        <CardHeader>
+          <CardTitle><h1>Kunci API</h1></CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={create}>
+            <FieldGroup className="gap-3">
+              <Field>
+                <FieldLabel htmlFor="key-name">Nama</FieldLabel>
+                <Input id="key-name" value={name} onChange={(event) => setName(event.target.value)} />
+              </Field>
+              <Button className="w-fit" type="submit">Buat</Button>
+            </FieldGroup>
+          </form>
+        </CardContent>
+      </Card>
       {secret ? (
-        <p>
-          {secret}
-          <br />
-          Salin kunci ini sekarang. Kunci tidak ditampilkan lagi.
-        </p>
+        <Alert>
+          <AlertTitle className="font-mono break-all">{secret}</AlertTitle>
+          <AlertDescription>Salin kunci ini sekarang. Kunci tidak ditampilkan lagi.</AlertDescription>
+        </Alert>
       ) : null}
-      {message ? <p className="text-[#a1a1aa]">{message}</p> : null}
-      {failed ? <Failed onRetry={load} /> : null}
-      {rows === null && !failed ? <Loading /> : null}
-      {rows?.length === 0 ? <p className="text-[#a1a1aa]">Belum ada kunci.</p> : null}
-      {rows && rows.length > 0 ? (
-        <table className="w-full">
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.id} className="h-10">
-                <td>{row.name}</td>
-                <td>{row.key_prefix}</td>
-                <td>{row.revoked_at ? "dicabut" : ""}</td>
-                <td>
-                  {row.revoked_at ? null : (
-                    <button type="button" className={buttonClass} onClick={() => revoke(row.id)}>Cabut</button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      ) : null}
+      {message ? <p className="text-destructive">{message}</p> : null}
+      <Card>
+        <CardContent className="flex flex-col gap-3">
+          {failed ? <Failed onRetry={load} /> : null}
+          {rows === null && !failed ? <LoadingRows /> : null}
+          {rows?.length === 0 ? <EmptyState>Belum ada kunci.</EmptyState> : null}
+          {rows && rows.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nama</TableHead>
+                  <TableHead>Awalan</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rows.map((row) => (
+                  <TableRow key={row.id}>
+                    <TableCell>{row.name}</TableCell>
+                    <TableCell className="font-mono">{row.key_prefix}</TableCell>
+                    <TableCell>{row.revoked_at ? "dicabut" : ""}</TableCell>
+                    <TableCell>
+                      {row.revoked_at ? null : (
+                        <Button type="button" onClick={() => revoke(row.id)}>Cabut</Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : null}
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -117,31 +146,45 @@ export function ClientsPage() {
   }
 
   useEffect(load, []);
-  if (failed) return <Failed onRetry={load} />;
-  if (!data) return <Loading />;
-  if (data.api_keys.length === 0 && data.oauth.length === 0) return <p className="text-[#a1a1aa]">Belum ada klien.</p>;
+  const empty = data !== null && data.api_keys.length === 0 && data.oauth.length === 0;
   return (
-    <div>
-      <h1 className="mt-0">Klien</h1>
-      <table className="w-full">
-        <tbody>
-          {data.api_keys.map((row) => (
-            <tr key={row.id} className="h-10">
-              <td>{row.name}</td>
-              <td>{row.key_prefix}</td>
-              <td>{row.last_used_at ?? "belum dipakai"}</td>
-            </tr>
-          ))}
-          {data.oauth.map((row) => (
-            <tr key={row.client_name} className="h-10">
-              <td>{row.client_name}</td>
-              <td>oauth</td>
-              <td>{row.last_used_at}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <Card>
+      <CardHeader>
+        <CardTitle><h1>Klien</h1></CardTitle>
+      </CardHeader>
+      <CardContent>
+        {failed ? <Failed onRetry={load} /> : null}
+        {!data && !failed ? <LoadingRows /> : null}
+        {empty ? <EmptyState>Belum ada klien.</EmptyState> : null}
+        {data && !empty ? (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Nama</TableHead>
+                <TableHead>Jenis</TableHead>
+                <TableHead>Terakhir</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {data.api_keys.map((row) => (
+                <TableRow key={row.id}>
+                  <TableCell>{row.name}</TableCell>
+                  <TableCell className="font-mono">{row.key_prefix}</TableCell>
+                  <TableCell>{row.last_used_at ?? "belum dipakai"}</TableCell>
+                </TableRow>
+              ))}
+              {data.oauth.map((row) => (
+                <TableRow key={row.client_name}>
+                  <TableCell>{row.client_name}</TableCell>
+                  <TableCell>oauth</TableCell>
+                  <TableCell>{row.last_used_at}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        ) : null}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -199,19 +242,45 @@ export function SettingsPage() {
     }
   }
 
-  if (failed) return <Failed onRetry={load} />;
-  if (!form) return <Loading />;
   return (
-    <form className="grid max-w-xl gap-3" onSubmit={save}>
-      <h1 className="mt-0">Pengaturan</h1>
-      <label>URL publik <input className={fieldClass} value={form.public_base_url} onChange={(event) => setForm({ ...form, public_base_url: event.target.value })} /></label>
-      <label>Batas shell <input className={fieldClass} type="number" value={form.shell_concurrency_limit} onChange={(event) => setForm({ ...form, shell_concurrency_limit: Number(event.target.value) })} /></label>
-      <label>Timeout shell <input className={fieldClass} type="number" value={form.shell_timeout_ms} onChange={(event) => setForm({ ...form, shell_timeout_ms: Number(event.target.value) })} /></label>
-      <label>Timeout maksimum <input className={fieldClass} type="number" value={form.shell_timeout_max_ms} onChange={(event) => setForm({ ...form, shell_timeout_max_ms: Number(event.target.value) })} /></label>
-      <button className={buttonClass} type="submit">Simpan</button>
-      {message ? <p className="text-[#a1a1aa]">{message}</p> : null}
-      {notice ? <p>{notice}</p> : null}
-    </form>
+    <Card>
+      <CardHeader>
+        <CardTitle><h1>Pengaturan</h1></CardTitle>
+      </CardHeader>
+      <CardContent>
+        {failed ? <Failed onRetry={load} /> : null}
+        {!form && !failed ? <LoadingRows /> : null}
+        {form ? (
+          <form onSubmit={save}>
+            <FieldGroup className="max-w-xl gap-3">
+              <Field>
+                <FieldLabel htmlFor="public-url">URL publik</FieldLabel>
+                <Input id="public-url" value={form.public_base_url} onChange={(event) => setForm({ ...form, public_base_url: event.target.value })} />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="shell-limit">Batas shell</FieldLabel>
+                <Input id="shell-limit" type="number" value={form.shell_concurrency_limit} onChange={(event) => setForm({ ...form, shell_concurrency_limit: Number(event.target.value) })} />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="shell-timeout">Timeout shell</FieldLabel>
+                <Input id="shell-timeout" type="number" value={form.shell_timeout_ms} onChange={(event) => setForm({ ...form, shell_timeout_ms: Number(event.target.value) })} />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="shell-timeout-max">Timeout maksimum</FieldLabel>
+                <Input id="shell-timeout-max" type="number" value={form.shell_timeout_max_ms} onChange={(event) => setForm({ ...form, shell_timeout_max_ms: Number(event.target.value) })} />
+              </Field>
+              <Button className="w-fit" type="submit">Simpan</Button>
+              {message ? <p className="text-destructive">{message}</p> : null}
+              {notice ? (
+                <Alert>
+                  <AlertDescription>{notice}</AlertDescription>
+                </Alert>
+              ) : null}
+            </FieldGroup>
+          </form>
+        ) : null}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -257,7 +326,7 @@ export function MemoriesPage() {
   }
 
   async function remove(memoryKey: string) {
-    const result = await api<{ ok: boolean }>(`/api/memories/${memoryKey}`, { method: "DELETE" });
+    const result = await api<{ ok: boolean }>(`/api/memories/${encodeURIComponent(memoryKey)}`, { method: "DELETE" });
     if (!result.ok) {
       setMessage(result.message);
       return;
@@ -266,26 +335,63 @@ export function MemoriesPage() {
   }
 
   return (
-    <div>
-      <h1 className="mt-0">Memori</h1>
-      <form className="mb-6 grid max-w-xl gap-3" onSubmit={save}>
-        <input className={fieldClass} value={key} onChange={(event) => setKey(event.target.value)} placeholder="key" />
-        <textarea className="min-h-24 rounded-[8px] bg-[#09090b] p-3 text-[#fafafa]" value={body} onChange={(event) => setBody(event.target.value)} placeholder="body" />
-        <input className={fieldClass} value={projectPath} onChange={(event) => setProjectPath(event.target.value)} placeholder="project path" />
-        <button className={buttonClass} type="submit">Simpan</button>
-      </form>
-      {message ? <p className="text-[#a1a1aa]">{message}</p> : null}
-      {failed ? <Failed onRetry={load} /> : null}
-      {rows === null && !failed ? <Loading /> : null}
-      {rows?.length === 0 ? <p>Belum ada memori.</p> : null}
-      {rows?.map((row) => (
-        <div key={row.key} className="flex h-10 items-center gap-4">
-          <span>{row.key}</span>
-          <span className="text-[#a1a1aa]">{row.project_path ?? ""}</span>
-          <span className="text-[#a1a1aa]">{row.body.slice(0, 120)}</span>
-          <button type="button" className={buttonClass} onClick={() => remove(row.key)}>Hapus</button>
-        </div>
-      ))}
+    <div className="flex flex-col gap-4">
+      <Card>
+        <CardHeader>
+          <CardTitle><h1>Memori</h1></CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={save}>
+            <FieldGroup className="max-w-xl gap-3">
+              <Field>
+                <FieldLabel htmlFor="memory-key">Key</FieldLabel>
+                <Input id="memory-key" value={key} onChange={(event) => setKey(event.target.value)} />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="memory-body">Isi</FieldLabel>
+                <Textarea id="memory-body" value={body} onChange={(event) => setBody(event.target.value)} />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="memory-path">Path proyek</FieldLabel>
+                <Input id="memory-path" value={projectPath} onChange={(event) => setProjectPath(event.target.value)} />
+              </Field>
+              <Button className="w-fit" type="submit">Simpan</Button>
+            </FieldGroup>
+          </form>
+        </CardContent>
+      </Card>
+      {message ? <p className="text-destructive">{message}</p> : null}
+      <Card>
+        <CardContent className="flex flex-col gap-3">
+          {failed ? <Failed onRetry={load} /> : null}
+          {rows === null && !failed ? <LoadingRows /> : null}
+          {rows?.length === 0 ? <EmptyState>Belum ada memori.</EmptyState> : null}
+          {rows && rows.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Key</TableHead>
+                  <TableHead>Path</TableHead>
+                  <TableHead>Cuplikan</TableHead>
+                  <TableHead />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rows.map((row) => (
+                  <TableRow key={row.key}>
+                    <TableCell>{row.key}</TableCell>
+                    <TableCell className="max-w-40 truncate text-muted-foreground">{row.project_path ?? ""}</TableCell>
+                    <TableCell className="max-w-64 truncate text-muted-foreground">{row.body.slice(0, 120)}</TableCell>
+                    <TableCell>
+                      <Button type="button" onClick={() => remove(row.key)}>Hapus</Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : null}
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -311,21 +417,43 @@ export function SkillsPage() {
 
   useEffect(load, []);
   return (
-    <div>
-      <div className="mb-4 flex items-center justify-between">
-        <h1 className="mt-0">Skill</h1>
-        <a className={`${buttonClass} inline-flex items-center no-underline`} href="/skills/new">Baru</a>
-      </div>
-      {failed ? <Failed onRetry={load} /> : null}
-      {rows === null && !failed ? <Loading /> : null}
-      {rows?.length === 0 ? <p>Belum ada skill.</p> : null}
-      {rows?.map((row) => (
-        <a key={row.name} href={`/skills/${row.name}`} className="flex h-10 items-center gap-4 text-[#fafafa] no-underline">
-          <span>{row.name}</span>
-          <span className="text-[#a1a1aa]">{row.description}</span>
-        </a>
-      ))}
-    </div>
+    <Card>
+      <CardHeader>
+        <CardTitle><h1>Skill</h1></CardTitle>
+        <CardAction>
+          <Button asChild>
+            <a href="/skills/new">Baru</a>
+          </Button>
+        </CardAction>
+      </CardHeader>
+      <CardContent>
+        {failed ? <Failed onRetry={load} /> : null}
+        {rows === null && !failed ? <LoadingRows /> : null}
+        {rows?.length === 0 ? <EmptyState>Belum ada skill.</EmptyState> : null}
+        {rows && rows.length > 0 ? (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Nama</TableHead>
+                <TableHead>Deskripsi</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map((row) => (
+                <TableRow key={row.name}>
+                  <TableCell>
+                    <a className="text-foreground underline-offset-4 hover:text-primary" href={`/skills/${encodeURIComponent(row.name)}`}>
+                      {row.name}
+                    </a>
+                  </TableCell>
+                  <TableCell className="max-w-md truncate text-muted-foreground">{row.description}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        ) : null}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -341,7 +469,7 @@ export function SkillEditor({ name }: { name?: string }) {
     setLoading(true);
     setFailed(false);
     setMissing(false);
-    api<Skill>(`/api/skills/${name}`).then((result) => {
+    api<Skill>(`/api/skills/${encodeURIComponent(name)}`).then((result) => {
       setLoading(false);
       if (!result.ok) {
         if (result.status === 404) setMissing(true);
@@ -365,20 +493,39 @@ export function SkillEditor({ name }: { name?: string }) {
       setMessage(result.message);
       return;
     }
-    window.location.assign(`/skills/${result.data.name}`);
+    window.location.assign(`/skills/${encodeURIComponent(result.data.name)}`);
   }
 
-  if (missing) return <p>Skill ini tidak ada.</p>;
-  if (failed) return <Failed onRetry={load} />;
-  if (loading) return <Loading />;
   return (
-    <form className="grid max-w-3xl gap-3" onSubmit={save}>
-      <h1 className="mt-0">{name ? skill.name : "Skill baru"}</h1>
-      <input className={fieldClass} value={skill.name} onChange={(event) => setSkill({ ...skill, name: event.target.value })} placeholder="name" />
-      <input className={fieldClass} value={skill.description} onChange={(event) => setSkill({ ...skill, description: event.target.value })} placeholder="description" />
-      <textarea className="min-h-64 rounded-[8px] bg-[#09090b] p-3 font-mono text-[#fafafa]" value={skill.body} onChange={(event) => setSkill({ ...skill, body: event.target.value })} />
-      <button className={buttonClass} type="submit">Simpan</button>
-      {message ? <p className="text-[#a1a1aa]">{message}</p> : null}
-    </form>
+    <Card>
+      <CardHeader>
+        <CardTitle><h1>{name ? skill.name || name : "Skill baru"}</h1></CardTitle>
+      </CardHeader>
+      <CardContent>
+        {missing ? <p>Skill ini tidak ada.</p> : null}
+        {failed ? <Failed onRetry={load} /> : null}
+        {loading ? <LoadingRows /> : null}
+        {!missing && !failed && !loading ? (
+          <form onSubmit={save}>
+            <FieldGroup className="max-w-3xl gap-3">
+              <Field>
+                <FieldLabel htmlFor="skill-name">Nama</FieldLabel>
+                <Input id="skill-name" value={skill.name} onChange={(event) => setSkill({ ...skill, name: event.target.value })} />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="skill-description">Deskripsi</FieldLabel>
+                <Input id="skill-description" value={skill.description} onChange={(event) => setSkill({ ...skill, description: event.target.value })} />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="skill-body">Isi</FieldLabel>
+                <Textarea id="skill-body" className="min-h-64 font-mono" value={skill.body} onChange={(event) => setSkill({ ...skill, body: event.target.value })} />
+              </Field>
+              <Button className="w-fit" type="submit">Simpan</Button>
+              {message ? <p className="text-destructive">{message}</p> : null}
+            </FieldGroup>
+          </form>
+        ) : null}
+      </CardContent>
+    </Card>
   );
 }

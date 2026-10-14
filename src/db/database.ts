@@ -1,10 +1,20 @@
 import { mkdirSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { Database } from "bun:sqlite";
+import { seedPlanSkill } from "../tools/skills.ts";
 
 export function openDatabase(databasePath: string): Database {
   if (databasePath !== ":memory:") {
-    mkdirSync(dirname(databasePath), { recursive: true });
+    try {
+      mkdirSync(dirname(databasePath), { recursive: true });
+    } catch (error) {
+      const code = typeof error === "object" && error !== null && "code" in error ? (error as { code?: string }).code : undefined;
+      if (code === "EROFS" || code === "EACCES") {
+        console.error(JSON.stringify({ level: "error", msg: "database_path_not_writable", path: databasePath }));
+        throw new Error("database_path_not_writable");
+      }
+      throw error;
+    }
   }
 
   const db = new Database(databasePath, { create: true });
@@ -18,6 +28,7 @@ export function openDatabase(databasePath: string): Database {
     )
   `);
   applyMigrations(db);
+  seedPlanSkill(db);
   return db;
 }
 
