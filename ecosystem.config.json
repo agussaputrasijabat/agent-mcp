@@ -1,0 +1,12 @@
+{
+  "apps": [
+    {
+      "name": "agent-mcp",
+      "cwd": ".",
+      "script": "bun",
+      "args": ["--no-env-file", "--env-file=.env.production", "run", "start:prod"],
+      "interpreter": "none",
+      "watch": false
+    }
+  ]
+}

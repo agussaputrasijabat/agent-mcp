@@ -3,10 +3,12 @@
   "module": "src/index.ts",
   "type": "module",
   "private": true,
+  "license": "MIT",
   "scripts": {
     "dev": "bun run build && bun --watch src/index.ts",
     "build": "vite build",
     "start": "bun run build && bun src/index.ts",
+    "start:prod": "bun --no-env-file run build && bun --no-env-file --env-file=.env.production src/index.ts",
     "test": "bun test",
     "schema:tokens": "bun scripts/schema-tokens.ts",
     "operator:reset-password": "bun scripts/reset-password.ts"
