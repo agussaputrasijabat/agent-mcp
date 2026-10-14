@@ -204,7 +204,7 @@ Ketergantungan: anotasi dipasang di fase yang menambah tool itu. Fase 1 memasang
 
 #### F-006 Instruksi server
 
-Field `instructions` pada `McpServer` sama dengan isi `prompts/server-instructions.txt` setelah spasi dan newline di ujung dihapus. String hasil trim panjangnya 354 karakter, di bawah 512.
+Field `instructions` pada `McpServer` sama dengan isi `prompts/server-instructions.txt` setelah spasi dan newline di ujung dihapus. String hasil trim panjangnya 450 karakter, di bawah 512.
 
 Acceptance criteria:
 
