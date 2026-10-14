@@ -19,10 +19,14 @@ export const shellInput = z.object({
 export class ShellGate {
   private running = 0;
 
-  constructor(readonly limit = SHELL_CONCURRENCY) {}
+  constructor(private readonly limitSource: number | (() => number) = SHELL_CONCURRENCY) {}
+
+  currentLimit(): number {
+    return typeof this.limitSource === "function" ? this.limitSource() : this.limitSource;
+  }
 
   tryAcquire(): boolean {
-    if (this.running >= this.limit) return false;
+    if (this.running >= this.currentLimit()) return false;
     this.running += 1;
     return true;
   }
@@ -60,7 +64,7 @@ export async function runShell(
   }
 
   if (!gate.tryAcquire()) {
-    return fail("shell_busy", `too many commands are running, limit is ${gate.limit}`);
+    return fail("shell_busy", `too many commands are running, limit is ${gate.currentLimit()}`);
   }
 
   try {

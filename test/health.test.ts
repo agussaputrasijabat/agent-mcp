@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, test } from "bun:test";
-import { createApp } from "../src/app.ts";
+import { testApp } from "./harness.ts";
 import { openDatabase } from "../src/db/database.ts";
 
 const directories: string[] = [];
@@ -17,7 +17,7 @@ test("GET /health returns ok", async () => {
   const directory = mkdtempSync(join(tmpdir(), "agent-mcp-"));
   directories.push(directory);
   const db = openDatabase(join(directory, "agent.sqlite"));
-  const app = createApp(db);
+  const app = await testApp(db);
 
   const response = await app.request("/health", { headers: { host: "127.0.0.1" } });
   const body = (await response.json()) as { data: { ok: boolean }; error: null };
@@ -41,6 +41,6 @@ test("migrations apply twice and enable WAL", () => {
   };
 
   expect(mode.journal_mode).toBe("wal");
-  expect(migrations.count).toBe(2);
+  expect(migrations.count).toBe(3);
   second.close();
 });

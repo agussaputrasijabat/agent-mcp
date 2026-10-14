@@ -1,15 +1,18 @@
-import { Database } from "bun:sqlite";
-import { createApp } from "../src/app.ts";
+import { createApiKey } from "../src/auth/keys.ts";
+import { openDatabase } from "../src/db/database.ts";
 import { parseMcpBody } from "../src/mcp/message.ts";
+import { testApp } from "../test/harness.ts";
 
-const db = new Database(":memory:");
-const app = createApp(db, { instructions: "schema probe" });
+const db = openDatabase(":memory:");
+const app = await testApp(db, { instructions: "schema probe" });
+const key = createApiKey(db, "schema").secret;
 const response = await app.request("/mcp", {
   method: "POST",
   headers: {
     host: "127.0.0.1",
     "content-type": "application/json",
     accept: "application/json, text/event-stream",
+    authorization: `Bearer ${key}`,
   },
   body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
 });

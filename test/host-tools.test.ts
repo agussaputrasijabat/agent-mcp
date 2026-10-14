@@ -2,8 +2,9 @@ import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:f
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, test } from "bun:test";
-import { Database } from "bun:sqlite";
-import { createApp } from "../src/app.ts";
+import { createApiKey } from "../src/auth/keys.ts";
+import { openDatabase } from "../src/db/database.ts";
+import { testApp } from "./harness.ts";
 import { assertInstructions, readServerInstructions } from "../src/mcp/instructions.ts";
 import { editFile, findFiles, readFile, searchFiles, writeFile } from "../src/tools/files.ts";
 import { runShell, ShellGate } from "../src/tools/shell.ts";
@@ -179,9 +180,10 @@ test("web_fetch blocks private addresses and returns http status", async () => {
 });
 
 test("tools/list exposes seven host tools and instructions", async () => {
-  const db = new Database(":memory:");
-  const app = createApp(db, { instructions: readServerInstructions() });
-  const listed = await postMcp(app, "tools/list");
+  const db = openDatabase(":memory:");
+  const app = await testApp(db, { instructions: readServerInstructions() });
+  const key = createApiKey(db, "test").secret;
+  const listed = await postMcp(app, "tools/list", undefined, key);
   const names = listed.body.result?.tools?.map((tool) => tool.name) ?? [];
   expect(names).toEqual([
     "read_file",
@@ -208,7 +210,7 @@ test("tools/list exposes seven host tools and instructions", async () => {
     protocolVersion: "2025-11-25",
     capabilities: {},
     clientInfo: { name: "test", version: "0" },
-  });
+  }, key);
   expect(initialized.body.result?.serverInfo?.instructions).toBe(readServerInstructions());
-  expect(assertInstructions(readServerInstructions()).length).toBe(354);
+  expect(assertInstructions(readServerInstructions()).length).toBe(450);
 });

@@ -1,6 +1,7 @@
 import { createMcpHandler, McpServer } from "@modelcontextprotocol/server";
 import type { Database } from "bun:sqlite";
-import { SHELL_CONCURRENCY } from "../limits.ts";
+import { readSettings, type Settings } from "../db/settings.ts";
+import { SHELL_CONCURRENCY, SHELL_TIMEOUT_MAX_MS, SHELL_TIMEOUT_MS } from "../limits.ts";
 import {
   editFile,
   editFileInput,
@@ -53,9 +54,15 @@ const deleteAnnotations = {
   openWorldHint: false,
 } as const;
 
-export function createHostHandler(options: { db: Database; instructions: string; shellConcurrency?: number }) {
-  const gate = new ShellGate(options.shellConcurrency ?? SHELL_CONCURRENCY);
+export function createHostHandler(options: {
+  db: Database;
+  instructions: string;
+  shellConcurrency?: number;
+  limits?: () => Pick<Settings, "shell_timeout_ms" | "shell_timeout_max_ms" | "shell_concurrency_limit">;
+}) {
+  const gate = new ShellGate(options.shellConcurrency ?? (() => options.limits?.().shell_concurrency_limit ?? SHELL_CONCURRENCY));
   const db = options.db;
+  const limits = options.limits ?? (() => readSettings(db));
   return createMcpHandler(() => {
     const server = new McpServer({
       name: "agent-mcp",
@@ -99,7 +106,11 @@ export function createHostHandler(options: { db: Database; instructions: string;
         inputSchema: shellInput,
         annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
       },
-      async (input) => runShell(input, gate),
+      async (input) =>
+        runShell(input, gate, {
+          timeoutMs: limits().shell_timeout_ms ?? SHELL_TIMEOUT_MS,
+          timeoutMaxMs: limits().shell_timeout_max_ms ?? SHELL_TIMEOUT_MAX_MS,
+        }),
     );
     server.registerTool(
       "web_fetch",
