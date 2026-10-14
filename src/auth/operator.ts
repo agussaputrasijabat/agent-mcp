@@ -1,14 +1,25 @@
+import { cimd } from "@better-auth/cimd";
+import { fetchClientMetadataResource } from "@better-auth/cimd/node";
+import { mcp } from "@better-auth/mcp";
 import { APIError } from "better-auth/api";
-import { betterAuth } from "better-auth";
+import { betterAuth, type Auth } from "better-auth";
 import { getMigrations } from "better-auth/db/migration";
+import { jwt } from "better-auth/plugins";
 import type { Database } from "bun:sqlite";
 
-export type OperatorAuth = ReturnType<typeof betterAuth>;
+export type OperatorAuth = Auth;
+
+const hour = 60 * 60;
+const day = 24 * hour;
 
 let allowOperatorCreate = false;
 
+export function mcpResourceUrl(baseURL: string): string {
+  return `${baseURL.replace(/\/$/, "")}/mcp`;
+}
+
 export async function createOperatorAuth(db: Database, options: { secret: string; baseURL: string }): Promise<OperatorAuth> {
-  const auth = betterAuth({
+  const config = {
     database: db,
     secret: options.secret,
     baseURL: options.baseURL,
@@ -26,8 +37,26 @@ export async function createOperatorAuth(db: Database, options: { secret: string
         },
       },
     },
-  });
-  await (await getMigrations(auth.options)).runMigrations();
+    plugins: [
+      jwt(),
+      mcp({
+        loginPage: "/login",
+        consentPage: "/consent",
+        resource: mcpResourceUrl(options.baseURL),
+        scopes: ["openid", "profile", "email", "offline_access", "mcp"],
+        accessTokenExpiresIn: hour,
+        refreshTokenExpiresIn: 30 * day,
+      }),
+      cimd({
+        fetchClientMetadataResource,
+        metadataProfile: "mcp-2026-07-28",
+      }),
+    ],
+  };
+  await (await getMigrations(config)).runMigrations();
+  const auth = betterAuth(config);
+  const ctx = await auth.$context;
+  if (ctx.checkSchema) await ctx.checkSchema();
   return auth;
 }
 

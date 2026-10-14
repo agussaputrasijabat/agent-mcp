@@ -1,7 +1,7 @@
 import type { Database } from "bun:sqlite";
 import { findActiveApiKey } from "./keys.ts";
 
-export type McpAuthOk = { ok: true; kind: "api_key"; subject: string };
+export type McpAuthOk = { ok: true; kind: "api_key"; subject: string } | { ok: true; kind: "oauth" };
 export type McpAuthNo = { ok: false; status: number; code: string; message: string };
 
 const resourceMetadata = (baseUrl: string) =>
@@ -24,7 +24,7 @@ export function decideMcpAuth(request: Request, db: Database, baseUrl: string): 
   }
 
   if (bearer && !bearer.startsWith("amcp_")) {
-    return { ok: false, status: 401, code: "invalid_api_key", message: "The credential is not a valid API key" };
+    return { ok: true, kind: "oauth" };
   }
 
   const presented = bearerKey || headerKey || queryKey;

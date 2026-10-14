@@ -19,16 +19,19 @@ export function loginPage(): string {
       document.querySelector("#login").addEventListener("submit", async (event) => {
         event.preventDefault();
         const form = event.currentTarget;
+        const oauthQuery = location.search.startsWith("?") ? location.search.slice(1) : "";
         const response = await fetch("/api/login", {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({
             email: form.email.value,
             password: form.password.value,
+            ...(oauthQuery.includes("sig=") ? { oauth_query: oauthQuery } : {}),
           }),
         });
         if (response.ok) {
-          location.href = "/";
+          const payload = await response.json().catch(() => null);
+          location.href = payload?.data?.redirect || "/";
           return;
         }
         document.querySelector("#error").hidden = false;
