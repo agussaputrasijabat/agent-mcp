@@ -115,7 +115,7 @@ export function createHostHandler(options: {
     server.registerTool(
       "web_fetch",
       {
-        description: "Fetch an HTTP or HTTPS URL and return text.",
+        description: "Fetch a URL from the MCP host when the client cannot reach it.",
         inputSchema: webFetchInput,
         annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
       },

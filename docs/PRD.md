@@ -166,7 +166,7 @@ Ketergantungan: F-001.
 
 #### F-004 Tool web_fetch
 
-Deskripsi MCP: `Fetch an HTTP or HTTPS URL and return text.`
+Deskripsi MCP: `Fetch a URL from the MCP host when the client cannot reach it.`
 
 Input: `url` wajib. Hanya skema `http` dan `https`. Timeout 20.000 ms. Redirect maksimum 3. Hasil dipotong 30.000 karakter.
 
@@ -204,7 +204,7 @@ Ketergantungan: anotasi dipasang di fase yang menambah tool itu. Fase 1 memasang
 
 #### F-006 Instruksi server
 
-Field `instructions` pada `McpServer` sama dengan isi `prompts/server-instructions.txt` setelah spasi dan newline di ujung dihapus. String hasil trim panjangnya 450 karakter, di bawah 512.
+Field `instructions` pada `McpServer` sama dengan isi `prompts/server-instructions.txt` setelah spasi dan newline di ujung dihapus. String hasil trim panjangnya 510 karakter, di bawah 512.
 
 Acceptance criteria:
 

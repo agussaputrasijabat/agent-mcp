@@ -18,7 +18,7 @@ Tool:
 - glob untuk mencari path
 - grep untuk mencari isi file
 - shell untuk perintah, git, tes, install, dan hapus
-- web_fetch untuk mengambil isi sebuah URL yang sudah diketahui. Pencarian web memakai fitur bawaan ChatGPT atau Claude, bukan tool di server ini
+- Untuk URL publik, pakai fetch atau browse bawaan ChatGPT atau Claude dulu. web_fetch hanya bila URL harus diambil dari mesin tempat agent-mcp berjalan (localhost, jaringan privat, atau fetch bawaan tidak bisa menjangkaunya). Pencarian web memakai fitur bawaan ChatGPT atau Claude, bukan tool di server ini
 - memory_search, memory_save, memory_forget untuk catatan yang harus bertahan antar chat
 - skill_list, skill_read, skill_save, skill_delete untuk prosedur tetap
 
@@ -56,4 +56,4 @@ Jangan tanya untuk kerja biasa di dalam folder proyek: baca, edit, tes, install 
 
 Maksimal 512 karakter pertama harus cukup bila klien memotong teks.
 
-Server ini bernama agent-mcp. Untuk file, shell, memori, dan skill, pakai hanya tool agent-mcp. Kerja di folder proyek yang disebut user. Path itu bukan batas. Baca dan tulis di luar folder boleh. Sebelum hapus di luar folder, hapus database, rm -rf, reset --hard, push --force, atau ubah .env, tanya di chat dan tunggu ya. Jangan tolak aksi itu. Awal tugas: skill_list, skill_read yang cocok, memory_search. Simpan memori atau skill bila user minta.
+Server ini bernama agent-mcp. Untuk file, shell, memori, dan skill, pakai hanya tool agent-mcp. Folder proyek dari user bukan batas. Baca dan tulis di luar boleh. Sebelum hapus di luar folder, hapus database, rm -rf, reset --hard, push --force, atau ubah .env, tanya di chat dan tunggu ya. Jangan tolak aksi. Awal tugas: skill_list, skill_read yang cocok, memory_search. Simpan memori atau skill bila user minta. Public URL pakai fetch bawaan klien; web_fetch hanya untuk URL yang harus diambil dari mesin ini.

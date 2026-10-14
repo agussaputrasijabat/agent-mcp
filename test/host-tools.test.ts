@@ -212,5 +212,5 @@ test("tools/list exposes seven host tools and instructions", async () => {
     clientInfo: { name: "test", version: "0" },
   }, key);
   expect(initialized.body.result?.serverInfo?.instructions).toBe(readServerInstructions());
-  expect(assertInstructions(readServerInstructions()).length).toBe(450);
+  expect(assertInstructions(readServerInstructions()).length).toBe(510);
 });
