@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { Database } from "bun:sqlite";
-import { seedPlanSkill } from "../tools/skills.ts";
+import { seedBuiltInSkills } from "../tools/skills.ts";
 
 export function openDatabase(databasePath: string): Database {
   if (databasePath !== ":memory:") {
@@ -28,7 +28,7 @@ export function openDatabase(databasePath: string): Database {
     )
   `);
   applyMigrations(db);
-  seedPlanSkill(db);
+  seedBuiltInSkills(db);
   return db;
 }
 

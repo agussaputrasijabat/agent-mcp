@@ -29,6 +29,7 @@ import {
   skillDelete,
   skillDeleteInput,
   skillList,
+  skillListInput,
   skillRead,
   skillReadInput,
   skillSave,
@@ -157,22 +158,40 @@ export function createHostHandler(options: {
       { description: "Delete one note by key.", inputSchema: memoryForgetInput, annotations: deleteAnnotations },
       async (input, ctx) => traced(db, "memory_forget", input, ctx, () => memoryForget(db, input)),
     );
-    server.registerTool("skill_list", { description: "List skill names and descriptions.", annotations: readOnly }, async (ctx) =>
-      traced(db, "skill_list", {}, ctx, () => skillList(db)),
+    server.registerTool(
+      "skill_list",
+      {
+        description: "List skill names and descriptions. Pass project_path to include read-only repo skills.",
+        inputSchema: skillListInput,
+        annotations: readOnly,
+      },
+      async (input, ctx) => traced(db, "skill_list", input, ctx, () => skillList(db, input)),
     );
     server.registerTool(
       "skill_read",
-      { description: "Read one skill body.", inputSchema: skillReadInput, annotations: readOnly },
+      {
+        description: "Read one skill body. Pass source repo and project_path for a repo skill.",
+        inputSchema: skillReadInput,
+        annotations: readOnly,
+      },
       async (input, ctx) => traced(db, "skill_read", input, ctx, () => skillRead(db, input)),
     );
     server.registerTool(
       "skill_save",
-      { description: "Create or replace a skill.", inputSchema: skillSaveInput, annotations: upsertAnnotations },
+      {
+        description: "Create or replace a database skill. Repo skills are read-only.",
+        inputSchema: skillSaveInput,
+        annotations: upsertAnnotations,
+      },
       async (input, ctx) => traced(db, "skill_save", input, ctx, () => skillSave(db, input)),
     );
     server.registerTool(
       "skill_delete",
-      { description: "Delete one skill by name.", inputSchema: skillDeleteInput, annotations: deleteAnnotations },
+      {
+        description: "Delete one database skill by name. Repo skills are read-only.",
+        inputSchema: skillDeleteInput,
+        annotations: deleteAnnotations,
+      },
       async (input, ctx) => traced(db, "skill_delete", input, ctx, () => skillDelete(db, input)),
     );
     return server;
