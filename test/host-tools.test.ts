@@ -71,6 +71,32 @@ test("read_file rejects a relative path", () => {
   expect(result.content[0].text.startsWith("error path_not_absolute:")).toBe(true);
 });
 
+test("read_file caps text at the output limit", () => {
+  const directory = tempDir();
+  const path = join(directory, "big.txt");
+  writeFileSync(path, "a".repeat(OUTPUT_CHAR_LIMIT + 25));
+  const result = readFile({ path });
+  expect(result.isError).toBeUndefined();
+  expect(result.content[0].text.endsWith("\n[truncated]")).toBe(true);
+  expect(result.content[0].text.length).toBe(OUTPUT_CHAR_LIMIT + "\n[truncated]".length);
+});
+
+test("read_file limit stops before a later invalid byte", () => {
+  const directory = tempDir();
+  const path = join(directory, "win.txt");
+  writeFileSync(path, Buffer.concat([Buffer.from("one\ntwo\n"), Buffer.from([0xff])]));
+  const result = readFile({ path, limit: 1 });
+  expect(result.isError).toBeUndefined();
+  expect(result.content[0].text).toBe("one");
+});
+
+test("read_file keeps an empty line inside the window", () => {
+  const directory = tempDir();
+  const path = join(directory, "gap.txt");
+  writeFileSync(path, "line1\n\nline3");
+  expect(readFile({ path, offset: 2, limit: 2 }).content[0].text).toBe("\nline3");
+});
+
 test("read_file reports an empty range", () => {
   const directory = tempDir();
   const path = join(directory, "note.txt");
@@ -176,6 +202,29 @@ test("glob lists matches and an empty directory", () => {
   expect(found.content[0].text.split("\n")).toHaveLength(2);
   const empty = tempDir();
   expect(findFiles({ pattern: "*.ts", path: empty }).content[0].text).toBe("");
+});
+
+test("glob skips node_modules and dotfiles unless the pattern names them", () => {
+  const directory = tempDir();
+  writeFileSync(join(directory, "a.ts"), "");
+  writeFileSync(join(directory, ".hidden.ts"), "");
+  mkdirSync(join(directory, "node_modules"));
+  writeFileSync(join(directory, "node_modules", "pkg.ts"), "");
+  const found = findFiles({ pattern: "*.ts", path: directory });
+  expect(found.content[0].text).toContain(join(directory, "a.ts"));
+  expect(found.content[0].text).not.toContain(".hidden.ts");
+  expect(found.content[0].text).not.toContain("pkg.ts");
+  const named = findFiles({ pattern: ".hidden.ts", path: directory });
+  expect(named.content[0].text).toContain(join(directory, ".hidden.ts"));
+});
+
+test("grep skips a binary file and keeps a text hit", () => {
+  const directory = tempDir();
+  writeFileSync(join(directory, "bin.dat"), Buffer.from([0, 104, 105, 116]));
+  writeFileSync(join(directory, "note.txt"), "hit");
+  const result = searchFiles({ pattern: "hit", path: directory });
+  expect(result.content[0].text).toContain("note.txt");
+  expect(result.content[0].text).not.toContain("bin.dat");
 });
 
 test("grep rejects a bad regex and caps matches", () => {

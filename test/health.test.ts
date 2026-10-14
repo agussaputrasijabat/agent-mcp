@@ -27,7 +27,7 @@ test("GET /health returns ok", async () => {
   db.close();
 });
 
-test("migrations apply twice and enable WAL", () => {
+test("migrations apply twice and enable WAL with normal sync", () => {
   const directory = mkdtempSync(join(tmpdir(), "agent-mcp-"));
   directories.push(directory);
   const databasePath = join(directory, "agent.sqlite");
@@ -36,11 +36,13 @@ test("migrations apply twice and enable WAL", () => {
   first.close();
   const second = openDatabase(databasePath);
   const mode = second.query("PRAGMA journal_mode").get() as { journal_mode: string };
+  const sync = second.query("PRAGMA synchronous").get() as { synchronous: number };
   const migrations = second.query("SELECT COUNT(*) AS count FROM schema_migrations").get() as {
     count: number;
   };
 
   expect(mode.journal_mode).toBe("wal");
+  expect(sync.synchronous).toBe(1);
   expect(migrations.count).toBe(4);
   second.close();
 });

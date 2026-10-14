@@ -281,6 +281,19 @@ test("repo skills are read-only and higher priority folders win", () => {
   db.close();
 });
 
+test("repo skill list sees a description edit", () => {
+  const project = mkdtempSync(join(tmpdir(), "agent-mcp-repo-"));
+  directories.push(project);
+  writeSkillDir(project, ".agents/skills", "review", "BODY", "Old description");
+  const db = openDatabase(fileDatabase());
+  expect(skillList(db, { project_path: project }).content[0].text).toContain("Old description");
+  writeSkillDir(project, ".agents/skills", "review", "BODY", "Fresh description");
+  const listed = skillList(db, { project_path: project }).content[0].text;
+  expect(listed).toContain("Fresh description");
+  expect(listed).not.toContain("Old description");
+  db.close();
+});
+
 function writeSkillDir(root: string, folder: string, name: string, body: string, description: string) {
   const directory = join(root, folder, name);
   mkdirSync(directory, { recursive: true });

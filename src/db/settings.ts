@@ -14,9 +14,21 @@ export type Settings = {
   output_char_limit: number;
 };
 
+const settingsCache = new WeakMap<Database, Settings>();
+
+function querySettings(db: Database): Settings {
+  const row = db.query("SELECT * FROM settings WHERE id = 1").get() as Settings | null;
+  if (!row) throw new Error("settings_missing");
+  settingsCache.set(db, row);
+  return row;
+}
+
 export function ensureSettings(db: Database, publicBaseUrl: string): Settings {
   const existing = db.query("SELECT * FROM settings WHERE id = 1").get() as Settings | null;
-  if (existing) return existing;
+  if (existing) {
+    settingsCache.set(db, existing);
+    return existing;
+  }
   const now = new Date().toISOString();
   db.query(
     `INSERT INTO settings (
@@ -27,9 +39,7 @@ export function ensureSettings(db: Database, publicBaseUrl: string): Settings {
 }
 
 export function readSettings(db: Database): Settings {
-  const row = db.query("SELECT * FROM settings WHERE id = 1").get() as Settings | null;
-  if (!row) throw new Error("settings_missing");
-  return row;
+  return settingsCache.get(db) ?? querySettings(db);
 }
 
 export class SettingsError extends Error {
@@ -64,6 +74,7 @@ export function updateSettings(db: Database, patch: Record<string, unknown>): Se
      SET public_base_url = ?, shell_concurrency_limit = ?, shell_timeout_ms = ?, shell_timeout_max_ms = ?, updated_at = ?
      WHERE id = 1`,
   ).run(next.public_base_url, next.shell_concurrency_limit, next.shell_timeout_ms, next.shell_timeout_max_ms, new Date().toISOString());
+  settingsCache.delete(db);
   return readSettings(db);
 }
 
