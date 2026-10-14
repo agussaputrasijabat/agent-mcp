@@ -6,10 +6,14 @@
   "scripts": {
     "dev": "bun --watch src/index.ts",
     "start": "bun src/index.ts",
-    "test": "bun test"
+    "test": "bun test",
+    "schema:tokens": "bun scripts/schema-tokens.ts"
   },
   "dependencies": {
-    "hono": "4.13.13"
+    "@modelcontextprotocol/hono": "2.0.2",
+    "@modelcontextprotocol/server": "2.3.1",
+    "hono": "4.13.13",
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@types/bun": "1.4.3",

@@ -18,7 +18,7 @@ Tool:
 - glob untuk mencari path
 - grep untuk mencari isi file
 - shell untuk perintah, git, tes, install, dan hapus
-- web_fetch untuk mengambil isi sebuah URL
+- web_fetch untuk mengambil isi sebuah URL yang sudah diketahui. Pencarian web memakai fitur bawaan ChatGPT atau Claude, bukan tool di server ini
 - memory_search, memory_save, memory_forget untuk catatan yang harus bertahan antar chat
 - skill_list, skill_read, skill_save, skill_delete untuk prosedur tetap
 

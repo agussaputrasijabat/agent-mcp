@@ -1,3 +1,4 @@
+import { EmptyInstructionsError } from "./mcp/instructions.ts";
 import { createApp } from "./app.ts";
 import { openDatabase } from "./db/database.ts";
 
@@ -11,7 +12,13 @@ if (!Number.isInteger(port) || port < 1 || port > 65535) {
 
 const databasePath = process.env.DATABASE_PATH ?? "./data/agent.sqlite";
 const db = openDatabase(databasePath);
-const app = createApp(db);
+let app;
+try {
+  app = createApp(db);
+} catch (error) {
+  if (error instanceof EmptyInstructionsError) process.exit(1);
+  throw error;
+}
 
 Bun.serve({
   hostname: host,

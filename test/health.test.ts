@@ -19,7 +19,7 @@ test("GET /health returns ok", async () => {
   const db = openDatabase(join(directory, "agent.sqlite"));
   const app = createApp(db);
 
-  const response = await app.request("/health");
+  const response = await app.request("/health", { headers: { host: "127.0.0.1" } });
   const body = (await response.json()) as { data: { ok: boolean }; error: null };
 
   expect(response.status).toBe(200);
