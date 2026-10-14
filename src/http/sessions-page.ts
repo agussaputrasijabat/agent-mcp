@@ -1,4 +1,5 @@
 import type { SessionRow, ToolCallRow } from "../db/tool-calls.ts";
+import { operatorNav } from "./nav.ts";
 
 function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (char) => {
@@ -12,7 +13,8 @@ function escapeHtml(value: string): string {
 
 const style = `
   :root { color-scheme: dark; }
-  body { margin: 0; background: #09090b; color: #fafafa; font-family: ui-sans-serif, system-ui, sans-serif; }
+  @font-face { font-family: Geist; src: url("/fonts/Geist-Variable.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+  body { margin: 0; background: #09090b; color: #fafafa; font-family: Geist, ui-sans-serif, system-ui, sans-serif; }
   main { max-width: 960px; margin: 24px auto; background: #18181b; border-radius: 12px; padding: 24px; }
   a { color: #fafafa; }
   td, th { height: 40px; text-align: left; padding: 0 8px; }
@@ -38,7 +40,7 @@ export function sessionsPage(items: SessionRow[]): string {
   return `<!doctype html>
 <html lang="id">
   <head><meta charset="utf-8" /><title>Sesi</title><style>${style}</style></head>
-  <body><main><h1>Sesi</h1>${body}</main></body>
+  <body><div style="display:flex;min-height:100vh">${operatorNav("/sessions")}<div style="flex:1"><main><h1>Sesi</h1>${body}</main></div></div></body>
 </html>`;
 }
 
@@ -55,6 +57,6 @@ export function sessionDetailPage(sessionKey: string, calls: ToolCallRow[]): str
   return `<!doctype html>
 <html lang="id">
   <head><meta charset="utf-8" /><title>Sesi</title><style>${style}</style></head>
-  <body><main><h1>${escapeHtml(sessionKey)}</h1>${body}</main></body>
+  <body><div style="display:flex;min-height:100vh">${operatorNav("/sessions")}<div style="flex:1"><main><h1>${escapeHtml(sessionKey)}</h1>${body}</main></div></div></body>
 </html>`;
 }

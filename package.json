@@ -5,7 +5,8 @@
   "private": true,
   "scripts": {
     "dev": "bun --watch src/index.ts",
-    "start": "bun src/index.ts",
+    "build": "vite build",
+    "start": "bun run build && bun src/index.ts",
     "test": "bun test",
     "schema:tokens": "bun scripts/schema-tokens.ts",
     "operator:reset-password": "bun scripts/reset-password.ts"
@@ -17,10 +18,19 @@
     "@modelcontextprotocol/server": "2.3.1",
     "better-auth": "1.7.7",
     "hono": "4.13.13",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
     "zod": "4.6.7"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "4.3.3",
     "@types/bun": "1.4.3",
-    "typescript": "7.0.2"
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.2",
+    "geist": "1.7.2",
+    "tailwindcss": "4.3.3",
+    "typescript": "7.0.2",
+    "vite": "8.3.4"
   }
 }

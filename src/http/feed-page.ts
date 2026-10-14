@@ -1,3 +1,5 @@
+import { operatorNav } from "./nav.ts";
+
 export function feedPage(): string {
   return `<!doctype html>
 <html lang="id">
@@ -6,7 +8,8 @@ export function feedPage(): string {
     <title>Feed</title>
     <style>
       :root { color-scheme: dark; }
-      body { margin: 0; background: #09090b; color: #fafafa; font-family: ui-sans-serif, system-ui, sans-serif; }
+      @font-face { font-family: Geist; src: url("/fonts/Geist-Variable.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+      body { margin: 0; background: #09090b; color: #fafafa; font-family: Geist, ui-sans-serif, system-ui, sans-serif; }
       main { max-width: 960px; margin: 24px auto; background: #18181b; border-radius: 12px; padding: 24px; }
       p { color: #a1a1aa; }
       table { width: 100%; border-collapse: collapse; }
@@ -16,6 +19,9 @@ export function feedPage(): string {
     </style>
   </head>
   <body>
+    <div style="display:flex;min-height:100vh">
+    ${operatorNav("/")}
+    <div style="flex:1">
     <main>
       <h1>Feed</h1>
       <p id="empty">Belum ada panggilan tool.</p>
@@ -31,6 +37,8 @@ export function feedPage(): string {
       </div>
       <div id="rows"></div>
     </main>
+    </div>
+    </div>
     <script>
       const empty = document.querySelector("#empty");
       const failed = document.querySelector("#failed");

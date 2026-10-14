@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import type { Context } from "hono";
 import { requireMcpAuth } from "@better-auth/mcp";
 import { createMcpHonoApp } from "@modelcontextprotocol/hono";
 import { oauthProviderAuthServerMetadata, verifyOAuthQueryParams } from "@better-auth/oauth-provider";
@@ -10,6 +11,7 @@ import { consentPage } from "./http/consent-page.ts";
 import { fail, ok } from "./http/json.ts";
 import { loginPage } from "./http/login-page.ts";
 import { decodeCursor, getToolCall, listSessions, listToolCalls } from "./db/tool-calls.ts";
+import { registerDashboard } from "./http/dashboard.ts";
 import { feedPage } from "./http/feed-page.ts";
 import { sessionDetailPage, sessionsPage } from "./http/sessions-page.ts";
 import { createHostHandler } from "./mcp/handler.ts";
@@ -114,7 +116,7 @@ export async function createApp(db: Database, options: AppOptions = {}) {
     return new Response(JSON.stringify({ data: { ok: true }, error: null }), { status: 200, headers });
   });
 
-  const operator = async (c: { req: { raw: Request } }) => auth.api.getSession({ headers: c.req.raw.headers });
+  const operator = async (c: Context) => auth.api.getSession({ headers: c.req.raw.headers });
 
   app.get("/api/me", async (c) => {
     const session = await operator(c);
@@ -199,6 +201,8 @@ export async function createApp(db: Database, options: AppOptions = {}) {
       () => run(c.req.raw),
     );
   });
+
+  registerDashboard(app, db, operator);
 
   return Object.assign(app, { auth });
 }
