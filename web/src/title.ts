@@ -14,6 +14,8 @@ export function titleForPath(path: string): string {
   if (path === "/clients") return "Klien";
   if (path === "/memories") return "Memori";
   if (path === "/settings") return "Pengaturan";
+  if (path === "/docs") return "Dokumentasi";
+  if (path === "/setup") return "Setup";
   if (path === "/skills" || path === "/skills/new") return "Skill";
   if (path.startsWith("/skills/")) {
     const name = decodeURIComponent(path.slice("/skills/".length));

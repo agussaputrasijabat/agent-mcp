@@ -1,4 +1,5 @@
 import { FeedPage } from "./feed.tsx";
+import { DocsPage, SetupPage } from "./guide.tsx";
 import { LoginPage } from "./login.tsx";
 import { ClientsPage, KeysPage, MemoriesPage, SettingsPage, SkillEditor, SkillsPage } from "./pages.tsx";
 import { SessionDetailPage, SessionsPage } from "./sessions.tsx";
@@ -21,5 +22,7 @@ export function App() {
   else if (path === "/skills") page = <SkillsPage />;
   else if (path === "/skills/new") page = <SkillEditor />;
   else if (path.startsWith("/skills/")) page = <SkillEditor name={decodeURIComponent(path.slice("/skills/".length))} />;
+  else if (path === "/docs") page = <DocsPage />;
+  else if (path === "/setup") page = <SetupPage />;
   return <Shell>{page}</Shell>;
 }

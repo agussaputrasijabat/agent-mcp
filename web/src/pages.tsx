@@ -3,7 +3,7 @@ import { api } from "./api.ts";
 import { EmptyState, Failed, LoadingRows } from "./shell.tsx";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -69,6 +69,9 @@ export function KeysPage() {
       <Card>
         <CardHeader>
           <CardTitle><h1>Kunci API</h1></CardTitle>
+          <CardDescription>
+            Endpoint MCP adalah alamat situs ini ditambah /mcp, yaitu <span className="font-mono break-all">{`${window.location.origin}/mcp`}</span>. Konektor tanpa kolom OAuth bisa menaruh kunci di query sebagai ?api_key=.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={create}>

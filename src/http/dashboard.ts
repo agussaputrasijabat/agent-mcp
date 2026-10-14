@@ -162,9 +162,10 @@ export function registerDashboard(app: Hono, db: Database, operator: OperatorChe
     return dashboardPage();
   };
 
-  for (const path of ["/keys", "/clients", "/settings", "/memories", "/skills", "/skills/new"]) {
+  for (const path of ["/keys", "/clients", "/settings", "/memories", "/skills", "/skills/new", "/docs", "/setup"]) {
     app.get(path, page);
   }
+  app.get("/tutorial", (c) => c.redirect("/docs"));
   app.get("/skills/:name", page);
   app.get("/favicon.svg", () => {
     return new Response(Bun.file(join(root, "web/public/favicon.svg")), {

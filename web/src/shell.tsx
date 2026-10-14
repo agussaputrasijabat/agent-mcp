@@ -3,11 +3,13 @@ import {
   BookOpen,
   Brain,
   ClockCounterClockwise,
+  FileText,
   GearSix,
   Key,
   PlugsConnected,
   Pulse,
   SidebarSimple,
+  Wrench,
 } from "@phosphor-icons/react";
 import { buttonVariants } from "@/components/ui/button";
 import { Button } from "@/components/ui/button";
@@ -45,6 +47,8 @@ const items: { href: string; label: string; icon: ComponentType<{ weight?: "bold
   { href: "/memories", label: "Memori", icon: Brain },
   { href: "/skills", label: "Skill", icon: BookOpen },
   { href: "/settings", label: "Pengaturan", icon: GearSix },
+  { href: "/docs", label: "Dokumentasi", icon: FileText },
+  { href: "/setup", label: "Setup", icon: Wrench },
 ];
 
 function selected(href: string, path: string): boolean {
