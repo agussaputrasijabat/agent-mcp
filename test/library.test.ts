@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, test } from "bun:test";
 import { memoryForget, memorySave, memorySearch } from "../src/tools/memory.ts";
-import { browseSkill } from "../src/tools/browse-skill.ts";
+import { browseSkill, previousBrowseBody } from "../src/tools/browse-skill.ts";
 import { planSkill, previousPlanBody } from "../src/tools/plan-skill.ts";
 import { skillDelete, skillList, skillRead, skillSave } from "../src/tools/skills.ts";
 import { openDatabase } from "../src/db/database.ts";
@@ -152,6 +152,9 @@ test("fresh database includes browse and keeps a custom browse", () => {
   expect(skillRead(first, { name: "browse" }).content[0].text).toBe(browseSkill.body);
   expect(browseSkill.body).toContain("npm install -g browse");
   expect(browseSkill.body).toContain("--local");
+  expect(browseSkill.body).toContain("read_file");
+  expect(browseSkill.body).toContain("browse screenshot --path /path/absolut/page.png --type png --local");
+  expect(browseSkill.body).toContain("blok image");
 
   const customBody = "Browse kustom yang tidak boleh ditimpa.";
   expect(skillSave(first, { name: "browse", description: "Catatan browse", body: customBody }).isError).toBeUndefined();
@@ -166,6 +169,42 @@ test("fresh database includes browse and keeps a custom browse", () => {
   expect(second.query("SELECT description, body, updated_at FROM skills WHERE name = ?").get("browse")).toEqual(saved);
   expect(skillRead(second, { name: "browse" }).content[0].text).toBe(customBody);
   second.close();
+});
+
+test("previous built-in browse upgrades and a custom body survives", () => {
+  const path = fileDatabase();
+  const first = openDatabase(path);
+  first
+    .query("UPDATE skills SET description = ?, body = ?, updated_at = ? WHERE name = ?")
+    .run(browseSkill.description, previousBrowseBody, "2020-01-01T00:00:00.000Z", "browse");
+  first.close();
+
+  const second = openDatabase(path);
+  const upgraded = second.query("SELECT description, body FROM skills WHERE name = ?").get("browse") as {
+    description: string;
+    body: string;
+  };
+  expect(previousBrowseBody).toContain("browse screenshot --path page.png --local");
+  expect(previousBrowseBody).not.toContain("read_file");
+  expect(previousBrowseBody).not.toBe(browseSkill.body);
+  expect(upgraded.description).toBe(browseSkill.description);
+  expect(upgraded.body).toBe(browseSkill.body);
+  expect(upgraded.body).toContain("read_file");
+  expect(upgraded.body).not.toContain("browse screenshot --path page.png --local");
+
+  const customBody = "Browse kustom yang tidak boleh ditimpa saat upgrade.";
+  expect(skillSave(second, { name: "browse", description: "Catatan browse", body: customBody }).isError).toBeUndefined();
+  const saved = second.query("SELECT description, body, updated_at FROM skills WHERE name = ?").get("browse") as {
+    description: string;
+    body: string;
+    updated_at: string;
+  };
+  second.close();
+
+  const third = openDatabase(path);
+  expect(third.query("SELECT description, body, updated_at FROM skills WHERE name = ?").get("browse")).toEqual(saved);
+  expect(skillRead(third, { name: "browse" }).content[0].text).toBe(customBody);
+  third.close();
 });
 
 test("repo skills are read-only and higher priority folders win", () => {

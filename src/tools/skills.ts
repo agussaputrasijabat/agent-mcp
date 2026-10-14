@@ -1,6 +1,6 @@
 import type { Database } from "bun:sqlite";
 import * as z from "zod/v4";
-import { browseSkill } from "./browse-skill.ts";
+import { browseSkill, previousBrowseBody } from "./browse-skill.ts";
 import { planSkill, previousPlanBody } from "./plan-skill.ts";
 import { findRepoSkill, isProjectError, loadRepoSkills, resolveProjectPath } from "./repo-skills.ts";
 import { fail, ok, type ToolResult } from "./result.ts";
@@ -32,7 +32,7 @@ type BuiltInSkill = { name: string; description: string; body: string };
 
 export function seedBuiltInSkills(db: Database): void {
   seedBuiltIn(db, planSkill, previousPlanBody);
-  seedBuiltIn(db, browseSkill, null);
+  seedBuiltIn(db, browseSkill, previousBrowseBody);
 }
 
 function seedBuiltIn(db: Database, skill: BuiltInSkill, previousBody: string | null): void {

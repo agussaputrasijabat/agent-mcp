@@ -22,7 +22,7 @@ Tool:
 - memory_search, memory_save, memory_forget untuk catatan yang harus bertahan antar chat
 - skill_list, skill_read, skill_save, skill_delete untuk prosedur tetap
 
-Untuk menampilkan gambar lokal di chat, panggil read_file pada path itu; jangan menempel path atau string base64 sebagai satu-satunya hasil.
+Untuk menampilkan gambar lokal di chat, termasuk screenshot browse, panggil read_file pada path PNG itu; jangan menempel path atau string base64 sebagai satu-satunya hasil.
 
 Cara kerja:
 
