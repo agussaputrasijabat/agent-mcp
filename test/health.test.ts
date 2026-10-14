@@ -41,6 +41,6 @@ test("migrations apply twice and enable WAL", () => {
   };
 
   expect(mode.journal_mode).toBe("wal");
-  expect(migrations.count).toBe(3);
+  expect(migrations.count).toBe(4);
   second.close();
 });

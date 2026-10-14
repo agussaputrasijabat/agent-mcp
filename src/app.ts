@@ -9,7 +9,11 @@ import { ensureSettings, readSettings } from "./db/settings.ts";
 import { consentPage } from "./http/consent-page.ts";
 import { fail, ok } from "./http/json.ts";
 import { loginPage } from "./http/login-page.ts";
+import { decodeCursor, getToolCall, listSessions, listToolCalls } from "./db/tool-calls.ts";
+import { feedPage } from "./http/feed-page.ts";
+import { sessionDetailPage, sessionsPage } from "./http/sessions-page.ts";
 import { createHostHandler } from "./mcp/handler.ts";
+import { runMcpRequest } from "./mcp/request-context.ts";
 import { assertInstructions, readServerInstructions } from "./mcp/instructions.ts";
 
 declare module "hono" {
@@ -110,10 +114,64 @@ export async function createApp(db: Database, options: AppOptions = {}) {
     return new Response(JSON.stringify({ data: { ok: true }, error: null }), { status: 200, headers });
   });
 
+  const operator = async (c: { req: { raw: Request } }) => auth.api.getSession({ headers: c.req.raw.headers });
+
   app.get("/api/me", async (c) => {
-    const session = await auth.api.getSession({ headers: c.req.raw.headers });
+    const session = await operator(c);
     if (!session) return fail(c, 401, "unauthorized", "Sign in required");
     return ok(c, { email: session.user.email });
+  });
+
+  app.get("/api/tool-calls", async (c) => {
+    if (!(await operator(c))) return fail(c, 401, "unauthorized", "Sign in required");
+    const limit = readLimit(c.req.query("limit"));
+    if (limit === "invalid") return fail(c, 400, "validation_error", "limit must be from 1 to 100");
+    const cursor = readPairCursor(c.req.query("cursor"));
+    if (cursor === "invalid") return fail(c, 400, "validation_error", "cursor is not valid");
+    const page = listToolCalls(db, {
+      limit,
+      cursor: cursor ? { startedAt: cursor[0] ?? "", id: cursor[1] ?? "" } : undefined,
+      toolName: c.req.query("tool_name") || undefined,
+      sessionKey: c.req.query("session_key") || undefined,
+    });
+    return ok(c, { items: page.items, next_cursor: page.nextCursor });
+  });
+
+  app.get("/api/tool-calls/:id", async (c) => {
+    if (!(await operator(c))) return fail(c, 401, "unauthorized", "Sign in required");
+    const row = getToolCall(db, c.req.param("id"));
+    if (!row) return fail(c, 404, "not_found", "Not found");
+    return ok(c, row);
+  });
+
+  app.get("/api/sessions", async (c) => {
+    if (!(await operator(c))) return fail(c, 401, "unauthorized", "Sign in required");
+    const limit = readLimit(c.req.query("limit"));
+    if (limit === "invalid") return fail(c, 400, "validation_error", "limit must be from 1 to 100");
+    const cursor = readPairCursor(c.req.query("cursor"));
+    if (cursor === "invalid") return fail(c, 400, "validation_error", "cursor is not valid");
+    const page = listSessions(db, {
+      limit,
+      cursor: cursor ? { lastStartedAt: cursor[0] ?? "", sessionKey: cursor[1] ?? "" } : undefined,
+    });
+    return ok(c, { items: page.items, next_cursor: page.nextCursor });
+  });
+
+  app.get("/", async (c) => {
+    if (!(await operator(c))) return c.redirect("/login");
+    return c.html(feedPage());
+  });
+
+  app.get("/sessions", async (c) => {
+    if (!(await operator(c))) return c.redirect("/login");
+    return c.html(sessionsPage(listSessions(db, { limit: 50 }).items));
+  });
+
+  app.get("/sessions/:sessionKey", async (c) => {
+    if (!(await operator(c))) return c.redirect("/login");
+    const sessionKey = c.req.param("sessionKey");
+    const calls = listToolCalls(db, { limit: 100, sessionKey }).items;
+    return c.html(sessionDetailPage(sessionKey, calls));
   });
 
   app.all("/mcp", (c) => {
@@ -121,12 +179,42 @@ export async function createApp(db: Database, options: AppOptions = {}) {
     if (!decision.ok) return mcpAuthResponse(decision, baseURL);
     const run = (request: Request) => handler.fetch(request, { parsedBody: c.get("parsedBody") });
     if (decision.kind === "oauth") {
-      return requireMcpAuth(auth, run, { resource, requiredScopes: ["mcp"] })(c.req.raw);
+      return requireMcpAuth(
+        auth,
+        (request, claims) =>
+          runMcpRequest(
+            {
+              request,
+              authKind: "oauth",
+              authSubject: typeof claims.sub === "string" ? claims.sub : "",
+              credential: decision.credential,
+            },
+            () => run(request),
+          ),
+        { resource, requiredScopes: ["mcp"] },
+      )(c.req.raw);
     }
-    return run(c.req.raw);
+    return runMcpRequest(
+      { request: c.req.raw, authKind: "api_key", authSubject: decision.subject, credential: decision.credential },
+      () => run(c.req.raw),
+    );
   });
 
   return Object.assign(app, { auth });
+}
+
+function readLimit(value: string | undefined): number | "invalid" {
+  if (value === undefined || value === "") return 50;
+  if (!/^\d+$/.test(value)) return "invalid";
+  const limit = Number(value);
+  if (limit < 1) return "invalid";
+  return Math.min(limit, 100);
+}
+
+function readPairCursor(value: string | undefined): string[] | undefined | "invalid" {
+  if (value === undefined || value === "") return undefined;
+  const decoded = decodeCursor(value);
+  return decoded ?? "invalid";
 }
 
 export type { OperatorAuth };
