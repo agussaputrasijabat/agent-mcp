@@ -10,6 +10,7 @@ import {
   WRITE_CHAR_LIMIT,
 } from "../limits.ts";
 import { codeFromErrno, requireAbsolute } from "./paths.ts";
+import { imageMime, readImageFile } from "./image.ts";
 import { fail, notice, ok, type ToolResult } from "./result.ts";
 
 const skippedDirectories = new Set(["node_modules", ".git", "dist"]);
@@ -48,6 +49,7 @@ export function readFile(input: z.infer<typeof readFileInput>): ToolResult {
   try {
     const info = statSync(input.path);
     if (info.isDirectory()) return fail("is_directory", "path is a directory");
+    if (imageMime(input.path)) return readImageFile(input.path);
     const decoded = decodeUtf8(readFileSync(input.path));
     if (typeof decoded !== "string") return decoded;
     const lines = decoded.split("\n");

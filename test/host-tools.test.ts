@@ -1,11 +1,14 @@
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { randomBytes } from "node:crypto";
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { crc32, deflateSync } from "node:zlib";
 import { afterEach, expect, test } from "bun:test";
 import { createApiKey } from "../src/auth/keys.ts";
 import { openDatabase } from "../src/db/database.ts";
 import { testApp } from "./harness.ts";
 import { assertInstructions, readServerInstructions } from "../src/mcp/instructions.ts";
+import { IMAGE_BASE64_CHAR_LIMIT, OUTPUT_CHAR_LIMIT } from "../src/limits.ts";
 import { editFile, findFiles, readFile, searchFiles, writeFile } from "../src/tools/files.ts";
 import { runShell, ShellGate } from "../src/tools/shell.ts";
 import { fetchUrl, isBlockedAddress } from "../src/tools/web-fetch.ts";
@@ -21,6 +24,37 @@ function tempDir(): string {
   const directory = mkdtempSync(join(tmpdir(), "agent-mcp-"));
   directories.push(directory);
   return directory;
+}
+
+function noisyPng(width: number, height: number): Buffer {
+  const rowBytes = 1 + width * 3;
+  const raw = Buffer.alloc(height * rowBytes);
+  const pixels = randomBytes(width * height * 3);
+  for (let y = 0; y < height; y++) {
+    const dest = y * rowBytes;
+    const source = y * width * 3;
+    pixels.copy(raw, dest + 1, source, source + width * 3);
+  }
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(width, 0);
+  ihdr.writeUInt32BE(height, 4);
+  ihdr[8] = 8;
+  ihdr[9] = 2;
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    pngChunk("IHDR", ihdr),
+    pngChunk("IDAT", deflateSync(raw, { level: 0 })),
+    pngChunk("IEND", Buffer.alloc(0)),
+  ]);
+}
+
+function pngChunk(tag: string, data: Buffer): Buffer {
+  const type = Buffer.from(tag, "ascii");
+  const length = Buffer.alloc(4);
+  length.writeUInt32BE(data.length);
+  const crc = Buffer.alloc(4);
+  crc.writeUInt32BE(crc32(Buffer.concat([type, data])) >>> 0);
+  return Buffer.concat([length, type, data, crc]);
 }
 
 test("read_file returns file text", () => {
@@ -51,6 +85,58 @@ test("read_file rejects a directory and invalid utf-8", () => {
   const path = join(directory, "bin.dat");
   writeFileSync(path, Buffer.from([0xff, 0xfe]));
   expect(readFile({ path }).content[0].text.startsWith("error not_utf8:")).toBe(true);
+});
+
+test("read_file returns an image block for a png and text for a text file", () => {
+  const directory = tempDir();
+  const imagePath = join(directory, "dot.png");
+  const png = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
+    "base64",
+  );
+  writeFileSync(imagePath, png);
+  const image = readFile({ path: imagePath });
+  expect(image.isError).toBeUndefined();
+  const block = image.content.find((item) => item.type === "image");
+  expect(block?.type).toBe("image");
+  if (block?.type === "image") {
+    expect(block.mimeType).toBe("image/png");
+    expect(block.data).toBe(png.toString("base64"));
+    expect(block.data).not.toContain("[truncated]");
+  }
+  expect(image.content[0].text).toContain(imagePath);
+  expect(image.content[0].text).toContain("1×1");
+  expect(image.content[0].text).not.toContain(png.toString("base64"));
+
+  const textPath = join(directory, "note.txt");
+  writeFileSync(textPath, "hello");
+  expect(readFile({ path: textPath }).content).toEqual([{ type: "text", text: "hello" }]);
+
+  const fakePath = join(directory, "fake.png");
+  writeFileSync(fakePath, "hello");
+  expect(readFile({ path: fakePath }).content[0].text.startsWith("error not_image:")).toBe(true);
+});
+
+test("read_file resizes an image that would exceed the tool result budget", () => {
+  const directory = tempDir();
+  const imagePath = join(directory, "noise.png");
+  const png = noisyPng(700, 500);
+  writeFileSync(imagePath, png);
+  expect(png.toString("base64").length).toBeGreaterThan(IMAGE_BASE64_CHAR_LIMIT);
+  const before = statSync(imagePath).size;
+  const image = readFile({ path: imagePath });
+  expect(statSync(imagePath).size).toBe(before);
+  expect(image.isError).toBeUndefined();
+  const block = image.content.find((item) => item.type === "image");
+  expect(block?.type).toBe("image");
+  if (block?.type !== "image") return;
+  expect(block.mimeType === "image/png" || block.mimeType === "image/jpeg").toBe(true);
+  expect(block.data.length).toBeGreaterThan(OUTPUT_CHAR_LIMIT);
+  expect(block.data.length).toBeLessThanOrEqual(IMAGE_BASE64_CHAR_LIMIT);
+  expect(block.data).not.toContain("[truncated]");
+  expect(image.content[0].text).toContain(imagePath);
+  expect(image.content[0].text).toContain("700×500");
+  expect(image.content[0].text).toContain("preview");
 });
 
 test("write_file creates parent directories and replaces contents", () => {

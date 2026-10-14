@@ -1,7 +1,10 @@
 import { OUTPUT_CHAR_LIMIT } from "../limits.ts";
 
+export type TextContent = { type: "text"; text: string };
+export type ImageContent = { type: "image"; data: string; mimeType: string };
+
 export type ToolResult = {
-  content: [{ type: "text"; text: string }];
+  content: [TextContent, ...ImageContent[]];
   isError?: boolean;
 };
 
@@ -18,6 +21,15 @@ export function fail(code: string, message: string): ToolResult {
   return {
     content: [{ type: "text", text: truncate(`error ${code}: ${message}`) }],
     isError: true,
+  };
+}
+
+export function imageResult(text: string, data: string, mimeType: string): ToolResult {
+  return {
+    content: [
+      { type: "text", text },
+      { type: "image", data, mimeType },
+    ],
   };
 }
 

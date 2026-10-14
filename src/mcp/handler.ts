@@ -92,7 +92,11 @@ export function createHostHandler(options: {
 
     server.registerTool(
       "read_file",
-      { description: "Read a UTF-8 file at an absolute path.", inputSchema: readFileInput, annotations: readOnly },
+      {
+        description: "Read a UTF-8 file at an absolute path. A png, jpeg, jpg, gif, or webp file is returned as an image the chat can show.",
+        inputSchema: readFileInput,
+        annotations: readOnly,
+      },
       async (input, ctx) => traced(db, "read_file", input, ctx, () => readFile(input)),
     );
     server.registerTool(

@@ -68,8 +68,13 @@ export function beginToolCall(db: Database, input: {
   return id;
 }
 
-export function finishToolCall(db: Database, id: string, result: { content?: { text?: string }[]; isError?: boolean }, durationMs: number, now = new Date()): void {
-  const text = storeText((result.content ?? []).map((item) => item.text ?? "").join("\n"));
+export function finishToolCall(db: Database, id: string, result: { content?: { type?: string; text?: string }[]; isError?: boolean }, durationMs: number, now = new Date()): void {
+  const text = storeText(
+    (result.content ?? [])
+      .filter((item) => item.type !== "image")
+      .map((item) => item.text ?? "")
+      .join("\n"),
+  );
   const isError = result.isError === true;
   db.query(
     `UPDATE tool_calls
