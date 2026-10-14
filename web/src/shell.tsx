@@ -21,9 +21,11 @@ export const contentColumnClass = "mx-auto w-full max-w-6xl";
 
 function readExpanded(): boolean {
   try {
-    return localStorage.getItem(storageKey) === "expanded";
+    const saved = localStorage.getItem(storageKey);
+    if (saved === "collapsed") return false;
+    return true;
   } catch {
-    return false;
+    return true;
   }
 }
 
