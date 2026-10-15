@@ -1,23 +1,80 @@
-# Kontribusi
+# Berkontribusi ke Agent MCP
 
-Perubahan masuk lewat pull request. Penyiapan lingkungan ada di [README.md](README.md).
+Terima kasih sudah meluangkan waktu untuk memperbaiki Agent MCP. Perubahan kecil, dokumentasi yang lebih jelas, laporan bug yang bisa direproduksi, dan pengujian semuanya berguna.
 
-## Lingkungan
+Baca [README](README.md) untuk gambaran proyek dan [arsitektur](docs/architecture.md) sebelum mengubah bagian yang memengaruhi autentikasi atau eksekusi tool.
 
-Salin `.env.example` menjadi `.env`. Jangan memasukkan `.env`, `.env.production`, atau rahasia lain ke git.
+## Sebelum membuka pull request
+
+- **Bug:** cari issue yang sudah ada. Bila belum ada, sertakan langkah reproduksi, hasil yang diharapkan, hasil aktual, dan versi Bun/OS host.
+- **Perubahan fitur:** jelaskan masalah yang ingin dipecahkan serta perilaku yang akan berubah. Untuk perubahan besar, diskusikan desain melalui issue lebih dulu.
+- **Masalah keamanan:** jangan sertakan exploit atau credential dalam issue publik. Ikuti [SECURITY.md](SECURITY.md).
+
+## Menyiapkan lingkungan
+
+Prasyarat: Bun dan Bash.
 
 ```bash
+git clone https://github.com/agussaputrasijabat/agent-mcp.git
+cd agent-mcp
 bun install
-bun run dev
-bun test
+cp .env.example .env
 ```
 
-`bun test` harus lulus sebelum pull request dibuka.
+Isi `.env` dengan data operator lokal. Password minimal 12 karakter dan `BETTER_AUTH_SECRET` minimal 32 karakter. Jangan commit file environment, database SQLite, log berisi rahasia, atau API key.
 
-## Pesan commit
+```bash
+bun run dev
+```
 
-Tulis pesan commit dalam bahasa Inggris.
+`dev` membangun UI dan menjalankan server dengan watch. Dashboard berada di `http://127.0.0.1:3000/login` bila memakai konfigurasi default.
 
-## Batas
+## Struktur kode
 
-Satu proses Bun menjalankan server dan konsol operator. Perintah di repo ini memakai `bun`, termasuk `bun install`, `bun run`, dan `bun test`.
+- `src/app.ts` untuk route dan integrasi HTTP.
+- `src/mcp/` untuk pendaftaran tool dan konteks permintaan MCP.
+- `src/tools/` untuk implementasi tool.
+- `src/auth/` untuk otorisasi dan login.
+- `src/db/` serta `migrations/` untuk penyimpanan.
+- `web/src/` untuk dashboard React.
+- `test/` untuk tes.
+- `docs/` untuk panduan pengguna dan referensi teknis.
+
+Jaga perubahan tetap terfokus. Hindari refactor di luar issue yang sedang dikerjakan.
+
+## Tes dan pemeriksaan
+
+Sebelum pull request:
+
+```bash
+bun test
+bun run build
+```
+
+Jika mengubah definisi tool MCP atau schema input, jalankan juga:
+
+```bash
+bun run schema:tokens
+```
+
+Untuk bug, tambahkan tes yang gagal sebelum perbaikan dan lulus setelahnya jika memungkinkan. Perubahan docs-only tidak memerlukan tes baru, tetapi tetap periksa contoh perintah, path, dan tautan.
+
+## Gaya kontribusi
+
+- Gunakan **Bun** untuk perintah proyek; hindari mencampur lockfile package manager lain.
+- Ikuti gaya TypeScript/React yang sudah ada, bukan memperkenalkan konvensi baru tanpa alasan.
+- Simpan rahasia di environment, jangan di source code atau fixture yang dikomit.
+- Jelaskan perubahan perilaku autentikasi, jaringan, atau akses file di dokumentasi.
+- Tulis pesan commit singkat dalam bahasa Inggris. Format seperti `docs: clarify OAuth setup` atau `fix: handle invalid tool path` dianjurkan.
+
+## Checklist pull request
+
+- [ ] Scope PR jelas dan tidak mencampur perubahan tidak terkait.
+- [ ] `bun test` lulus (atau alasan kegagalan dicantumkan).
+- [ ] `bun run build` lulus (atau alasan kegagalan dicantumkan).
+- [ ] Dokumentasi dan tes diperbarui jika perilaku berubah.
+- [ ] Tidak ada API key, password, token, database, atau data pribadi dalam perubahan.
+
+Sertakan ringkasan perubahan, cara pengujian, dan screenshot hanya bila UI berubah. Maintainer dapat meminta perbaikan sebelum merge.
+
+Proyek menggunakan [lisensi MIT](LICENSE). Dengan mengajukan kontribusi, kamu menyetujui distribusinya sesuai lisensi repository.

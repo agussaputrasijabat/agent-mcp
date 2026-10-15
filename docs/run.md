@@ -1,47 +1,101 @@
-# Menjalankan agent-mcp
+# Instalasi dan deployment
 
-Salin `.env.example` menjadi `.env`. Isi `DASHBOARD_EMAIL`, `DASHBOARD_PASSWORD` (minimal 12 karakter), dan `BETTER_AUTH_SECRET` (minimal 32 karakter). `PUBLIC_BASE_URL` adalah asal yang dipakai metadata OAuth. Bun memuat `.env` sendiri.
+Pilih cara menjalankan berdasarkan lokasi host. Semua pilihan memakai proses Bun yang sama dan endpoint MCP `/mcp`.
 
-`bun install` sekali. `bun run start` membangun dashboard lalu menjalankan proses yang sama.
+## Persiapan
+
+Pastikan [Bun](https://bun.sh/) dan `bash` tersedia. Dari root repository:
+
+```bash
+bun install
+cp .env.example .env
+```
+
+Isi `.env` dengan `DASHBOARD_EMAIL`, `DASHBOARD_PASSWORD` (minimum 12 karakter), `BETTER_AUTH_SECRET` (minimum 32 karakter), `PUBLIC_BASE_URL`, dan konfigurasi host/database yang diperlukan. Bun membaca file `.env` secara otomatis saat perintah biasa dijalankan.
+
+- `bun run dev`: build dashboard lalu jalankan server dengan watch.
+- `bun run start`: build dashboard lalu jalankan server tanpa watch.
+- `bun run build`: hanya build dashboard.
+- `bun test`: jalankan tes.
+- `bun run operator:reset-password`: ganti password operator yang sudah ada memakai variabel lingkungan aktif.
+
+Konfigurasi semua variabel dijelaskan di [configuration.md](configuration.md).
 
 ## Laptop
 
-`HOST=127.0.0.1` membuat proses hanya menerima koneksi di antarmuka loopback. Port tidak menerima koneksi dari antarmuka lain.
+Untuk penggunaan lokal, jalankan dengan loopback:
 
 ```bash
 HOST=127.0.0.1 PORT=3000 PUBLIC_BASE_URL=http://127.0.0.1:3000 bun run start
 ```
 
-## Tunnel
-
-Server tetap di laptop, pada `127.0.0.1:3000`. OpenAI Secure MCP Tunnel memakai `tunnel-client`: klien itu membuka HTTPS keluar ke OpenAI dan meneruskan permintaan MCP ke URL lokal. Ambil `tunnel_id` dari Platform tunnel settings, lalu jalankan klien di mesin yang sudah bisa mencapai server.
-
-Kalau dashboard atau klien dibuka dari origin publik, set `PUBLIC_BASE_URL` ke origin `https://` itu dan arahkan tunnel ke port lokal. Kalau header `Host` berbeda dari hostname origin itu, isi `ALLOWED_HOSTS` dengan hostname tersebut, dipisah koma bila ada lebih dari satu. Daftar yang sama dipakai untuk header `Host` dan `Origin`, jadi `/assets` dan favicon bisa dimuat tanpa sesi dashboard. `TRUST_PROXY=true` membuat IP klien dibaca dari header proxy untuk batas percobaan login.
+`127.0.0.1` tidak menerima sambungan langsung dari perangkat lain. Login dashboard berada di `http://127.0.0.1:3000/login`. Uji kesehatan:
 
 ```bash
-tunnel-client init --profile agent-mcp --tunnel-id "$TUNNEL_ID" --mcp-server-url http://127.0.0.1:3000/mcp && tunnel-client run --profile agent-mcp
+curl http://127.0.0.1:3000/health
 ```
 
-Di ChatGPT, tambahkan MCP kustom dengan koneksi Tunnel dan `tunnel_id` yang sama.
+Endpoint MCP berada di `http://127.0.0.1:3000/mcp`, tetapi mengaksesnya tanpa autentikasi akan menghasilkan `401`. Ini normal.
+
+## Tunnel
+
+Server tetap berjalan pada loopback laptop. Pilih salah satu pendekatan berikut sesuai fitur yang tersedia pada klien.
+
+### OpenAI Secure MCP Tunnel
+
+Jika akun/platform menyediakan koneksi Tunnel, ambil `tunnel_id` dari pengaturannya. Jalankan `tunnel-client` resmi yang sudah dipasang di mesin yang dapat mengakses Agent MCP:
+
+```bash
+tunnel-client init --profile agent-mcp --tunnel-id "$TUNNEL_ID" --mcp-server-url http://127.0.0.1:3000/mcp
+tunnel-client run --profile agent-mcp
+```
+
+Lalu gunakan identitas tunnel yang sama pada konektor ChatGPT. Cara ini memakai koneksi keluar HTTPS dari mesin host.
+
+### Tunnel dengan hostname HTTPS publik
+
+Jika memakai Cloudflare Tunnel atau penyedia tunnel lain, teruskan hostname HTTPS publik ke `http://127.0.0.1:3000`. Set `PUBLIC_BASE_URL` ke origin publik tersebut, misalnya `https://mcp.example.com`. Endpoint klien menjadi `https://mcp.example.com/mcp`.
+
+Jika header `Host` atau `Origin` berbeda dari hostname di `PUBLIC_BASE_URL`, tambahkan hostname yang memang diperlukan ke `ALLOWED_HOSTS` (pisah koma). Jangan izinkan sembarang host. Atur `TRUST_PROXY=true` hanya jika proxy yang meneruskan header memang tepercaya.
+
+Cloudflare Access yang membatasi `/mcp` ke perangkat operator saja dapat memutus koneksi ChatGPT atau Claude, karena pemanggilnya adalah layanan cloud mereka.
 
 ## VPS
 
-Proses duduk di belakang reverse proxy. Proxy meneruskan ke `127.0.0.1`. `TRUST_PROXY=true` membuat protokol dan IP klien dibaca dari header proxy. `PUBLIC_BASE_URL` harus `https://` dan sama dengan nama host publik.
+Jalankan Agent MCP pada antarmuka loopback, dengan reverse proxy HTTPS (misalnya Nginx atau Caddy) di depan server:
 
 ```bash
 HOST=127.0.0.1 PORT=3000 TRUST_PROXY=true PUBLIC_BASE_URL=https://mcp.example.com bun run start
 ```
 
-Cloudflare Access tidak boleh membatasi `/mcp` ke perangkat operator saja. Pemanggil tool adalah server OpenAI atau Anthropic, bukan browser operator.
+Konfigurasikan reverse proxy agar `https://mcp.example.com` diteruskan ke `http://127.0.0.1:3000`. Pastikan TLS aktif dan proxy mendukung koneksi HTTP yang diperlukan oleh MCP Streamable HTTP. Jangan mengekspos port Bun mentah ke internet apabila reverse proxy sudah digunakan.
+
+Gunakan akun OS khusus dengan izin minimal, jaga file SQLite tetap privat, dan aktifkan pencadangan. Baca [security.md](security.md) sebelum memublikasikan endpoint.
 
 ## PM2
 
-`.env.production` terpisah dari `.env`. `bun run dev` tetap memakai `.env`.
+Contoh `ecosystem.config.json` tersedia di root repository. Konfigurasi ini memakai environment produksi, terpisah dari `.env` pengembangan.
 
-Salin `.env.production.example` menjadi `.env.production`, lalu isi nilainya. `DASHBOARD_EMAIL`, `DASHBOARD_PASSWORD` (minimal 12 karakter), dan `BETTER_AUTH_SECRET` (minimal 32 karakter) wajib diisi. Contoh `DATABASE_PATH` adalah `./data/prod.sqlite`. Operator boleh mengganti path itu. `bun` harus ada di PATH proses PM2.
+```bash
+cp .env.production.example .env.production
+```
+
+Isi `.env.production` dengan kredensial kuat, `DATABASE_PATH` produksi, dan origin HTTPS publik yang benar. PM2 harus dapat menemukan executable `bun` di PATH.
 
 ```bash
 pm2 start ecosystem.config.json
 pm2 reload ecosystem.config.json
 pm2 logs agent-mcp
 ```
+
+Skrip `start:prod` membangun dashboard lalu menjalankan backend dengan `.env.production`. Perintah tersebut menggunakan opsi `--no-env-file` untuk mencegah pemuatan `.env` pengembangan. Reload setelah mengganti konfigurasi produksi.
+
+## Setelah server berjalan
+
+1. Buka `/health` untuk memeriksa server dan database.
+2. Login ke dashboard di `/login`.
+3. Buat API key atau sambungkan lewat OAuth.
+4. Buka **Setup**, salin instruksi proyek, lalu uji panggilan `read_file` dari klien.
+5. Periksa hasil dan error di Feed.
+
+[Konfigurasi](configuration.md) · [Koneksi klien](clients.md) · [Troubleshooting](troubleshooting.md)

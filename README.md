@@ -1,113 +1,133 @@
-# agent-mcp
+# Agent MCP
 
-Server MCP remote untuk ChatGPT, Claude, dan AI web lain. Model tetap di klien chat. Proses ini menjalankan tool file, shell, memori, dan skill di host. Ini bukan CLI seperti Claude Code.
+**Ubah ChatGPT atau Claude menjadi agen pemrograman yang bisa bekerja langsung di komputermu.**
 
-## Apa ini
+Agent MCP adalah server [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) sumber terbuka yang menghubungkan ChatGPT dan Claude ke mesin milikmu. Baca dan edit file, jalankan terminal, kelola proyek, dan uji kode langsung dari percakapan—tanpa perlu membuat API key untuk model AI atau membayar biaya per panggilan tool kepada Agent MCP.
 
-Klien chat memanggil endpoint `/mcp` dan memilih tool di sana. Proses di host menjalankan tool itu, lalu menyimpan jejak panggilan di SQLite.
+**Agent MCP gratis, tetapi penggunaan AI tetap mengikuti ketentuan penyedia.** Kuota, dukungan konektor MCP, dan fitur yang tersedia ditentukan oleh paket serta kebijakan OpenAI atau Anthropic. Biaya mesin, hosting, dan tunnel pihak ketiga (jika digunakan) juga ditanggung sendiri.
 
-Tool file membaca, menulis, mengedit, dan mencari berkas. `shell` menjalankan perintah di host. Memori menyimpan catatan yang tetap ada setelah proses dijalankan ulang. Skill menyimpan prosedur yang bisa dibaca lagi pada permintaan berikutnya. `web_fetch` mengambil URL dari host.
+Server ini **bukan** CLI, IDE, atau model AI. ChatGPT atau Claude memilih tool; Agent MCP menjalankannya di host yang kamu kelola. File, terminal, memori, skill, dan riwayat eksekusi tetap berada di mesin tersebut.
 
-Spesifikasi ada di [docs/PRD.md](docs/PRD.md).
+[Mulai cepat](#mulai-cepat) · [Menghubungkan klien](docs/clients.md) · [Daftar tool](docs/tools.md) · [Keamanan](docs/security.md) · [Kontribusi](CONTRIBUTING.md)
 
-## Konsol operator
+## Apa yang bisa dilakukan?
 
-Feed menampilkan panggilan tool. Halaman Kunci membuat dan mencabut kunci API untuk konektor. Halaman Setup mengisi path absolut proyek dan nama MCP, lalu menghasilkan teks instruksi proyek untuk ditempel ke custom instructions ChatGPT atau Claude.
+- **Bekerja dengan kode:** membaca, membuat, dan mengedit file; mencari path atau teks; menjalankan perintah shell, Git, build, dan tes.
+- **Menyimpan konteks:** memori lintas percakapan dan skill yang bisa digunakan kembali. Skill dalam repository juga dapat dibaca tanpa disalin ke database.
+- **Memantau aktivitas:** dashboard untuk feed panggilan tool, riwayat sesi, klien, API key, memori, skill, dan pengaturan.
+- **Terhubung secara remote:** endpoint MCP Streamable HTTP dengan API key atau OAuth, untuk penggunaan lokal maupun server publik.
 
-## Cara pakai
+### Cara kerjanya
+
+```mermaid
+flowchart LR
+    A["ChatGPT / Claude"] -->|MCP: OAuth atau API key| B["Agent MCP"]
+    C["Browser operator"] -->|Login| B
+    B --> D["File system dan Bash"]
+    B --> E[("SQLite: sesi, audit, memori, skill")]
+```
+
+Tool berjalan dengan **izin akun sistem operasi yang menjalankan server**, bukan di sandbox folder proyek. Baca [model keamanan](docs/security.md) sebelum membuka server ke internet.
+
+## Mulai cepat
+
+**Prasyarat:** [Bun](https://bun.sh/) dan `bash` terpasang di mesin host.
 
 ```bash
+git clone https://github.com/agussaputrasijabat/agent-mcp.git
+cd agent-mcp
 bun install
 cp .env.example .env
+```
+
+Isi `.env` dengan nilai untuk instalasi lokal:
+
+```dotenv
+HOST=127.0.0.1
+PORT=3000
+PUBLIC_BASE_URL=http://127.0.0.1:3000
+DATABASE_PATH=./data/agent.sqlite
+DASHBOARD_EMAIL=operator@example.com
+DASHBOARD_PASSWORD=ganti-dengan-password-minimal-12-karakter
+BETTER_AUTH_SECRET=ganti-dengan-secret-acak-minimal-32-karakter
+```
+
+Gunakan kata sandi dan secret acak sendiri; jangan gunakan nilai contoh pada server sungguhan. Lalu jalankan:
+
+```bash
 bun run dev
 ```
 
-Salin `.env.example` menjadi `.env`, lalu isi nilai yang diminta berkas itu. `DASHBOARD_PASSWORD` minimal 12 karakter. `BETTER_AUTH_SECRET` minimal 32 karakter. `PUBLIC_BASE_URL` adalah asal yang dipakai metadata OAuth. Bun memuat `.env` sendiri. `bun run dev` membangun dashboard, lalu menjalankan `src/index.ts` dengan watch.
+Buka [http://127.0.0.1:3000/login](http://127.0.0.1:3000/login), masuk dengan akun operator, dan buka menu **Kunci** atau **Setup** untuk menyambungkan klien. Endpoint MCP adalah `http://127.0.0.1:3000/mcp`; endpoint kesehatan tersedia di `/health`.
 
-Buka konsol operator di origin proses itu. Feed menampilkan panggilan tool.
+> Server yang hanya mendengarkan di `127.0.0.1` tidak bisa diakses langsung oleh layanan chat di internet. Gunakan tunnel atau reverse proxy HTTPS bila klien memerlukan alamat yang dapat dijangkau dari luar.
 
-Endpoint untuk konektor adalah `/mcp`.
+Panduan lengkap: [instalasi dan deployment](docs/run.md) serta [konfigurasi](docs/configuration.md).
 
-Buat kunci di halaman Kunci. Kunci berawalan `amcp_` dan hanya ditampilkan sekali. Claude mengirim kunci lewat header `X-Api-Key`, atau lewat header `Authorization` dengan Bearer dan kunci `amcp_`. Query `?api_key=` pada URL endpoint juga diterima. Konektor tanpa kolom OAuth menaruh kunci di query `?api_key=`. Query `api_key` di host publik harus lewat HTTPS. `localhost` dan `127.0.0.1` boleh HTTP.
+## Hubungkan ChatGPT atau Claude
 
-Konektor yang minta URL server memakai origin situs ditambah `/mcp`. Alamat yang sedang terbuka ada di halaman Setup.
+1. Jalankan Agent MCP di host dan tentukan apakah akan memakai **tunnel** atau **URL HTTPS publik**.
+2. Pilih autentikasi. **OAuth** menggunakan alur login dan consent operator. **API key** dibuat di menu **Kunci** dan hanya ditampilkan satu kali.
+3. Tambahkan server di klien MCP yang mendukung metode koneksi tersebut. Untuk koneksi berbasis URL, gunakan `https://domain-kamu/mcp`.
+4. Buka **Setup** di dashboard. Masukkan path absolut repository pada host dan nama konektor, lalu salin instruksi yang dihasilkan ke instruksi proyek ChatGPT atau Claude.
+5. Minta klien menjalankan tool sederhana seperti `glob` atau `read_file`, kemudian periksa hasilnya di **Feed**.
 
-Di halaman Setup, isi path absolut proyek di mesin MCP dan nama MCP yang sama dengan nama di konektor. Salin teks yang dihasilkan, lalu tempel ke custom instructions proyek di ChatGPT atau Claude.
+Detail per klien, cara mengirim API key, OAuth, dan tunnel: [docs/clients.md](docs/clients.md).
 
-OAuth masuk lewat `/login`. Halaman `/consent` punya tombol Izinkan dan Tolak. Resource OAuth sama dengan `PUBLIC_BASE_URL` ditambah `/mcp`.
+## Tool yang tersedia
+
+| Kelompok | Tool | Kegunaan |
+| --- | --- | --- |
+| File | `read_file`, `write_file`, `edit_file` | Baca, buat, atau ubah file |
+| Pencarian | `glob`, `grep` | Cari file atau teks |
+| Eksekusi | `shell` | Jalankan perintah Bash di host |
+| HTTP | `web_fetch` | Ambil URL dari host MCP |
+| Memori | `memory_search`, `memory_save`, `memory_forget` | Cari, simpan, atau hapus catatan |
+| Skill | `skill_list`, `skill_read`, `skill_save`, `skill_delete` | Kelola prosedur yang bisa dipakai ulang |
+
+Total **14 tool**. `read_file` juga dapat menampilkan berkas gambar yang didukung. `skill_list` bisa menemukan skill di `.agents/skills`, `.claude/skills`, `.codex/skills`, dan `.opencode/commands` bila diberi `project_path`.
+
+Agent MCP **tidak menyediakan `web_search`**. Gunakan pencarian web bawaan klien untuk pencarian umum. [Referensi lengkap setiap tool](docs/tools.md).
+
+## Dashboard operator
+
+| Halaman | Fungsi |
+| --- | --- |
+| Feed | Panggilan tool, hasil, waktu eksekusi, dan filter |
+| Sesi | Riwayat panggilan yang dikelompokkan per sesi |
+| Klien | API key aktif dan klien OAuth yang tercatat |
+| Kunci | Membuat serta mencabut API key |
+| Memori & Skill | Meninjau dan mengelola data tersimpan |
+| Pengaturan | URL publik dan batas eksekusi shell |
+| Dokumentasi & Setup | Panduan di aplikasi dan generator instruksi proyek |
+
+Dashboard menggunakan login operator dan database SQLite yang sama dengan server MCP.
+
+## Dokumentasi
+
+| Dokumen | Isi |
+| --- | --- |
+| [Instalasi & deployment](docs/run.md) | Laptop, tunnel, VPS, PM2, dan perintah operasional |
+| [Koneksi klien](docs/clients.md) | ChatGPT, Claude, API key, OAuth, dan instruksi proyek |
+| [Konfigurasi](docs/configuration.md) | Variabel lingkungan, default, dan pengaturan dashboard |
+| [Referensi tool](docs/tools.md) | Input, perilaku, contoh pemakaian, dan batas |
+| [Arsitektur](docs/architecture.md) | Alur permintaan, komponen, dan penyimpanan |
+| [Keamanan](docs/security.md) | Model kepercayaan, kredensial, izin host, dan audit |
+| [Troubleshooting](docs/troubleshooting.md) | Penyebab dan langkah pemeriksaan kesalahan umum |
+| [Berkontribusi](CONTRIBUTING.md) | Setup pengembangan, pengujian, dan pull request |
+| [Pelaporan kerentanan](SECURITY.md) | Cara melaporkan masalah keamanan secara privat |
 
 ## Pengembangan
 
 ```bash
-bun install
-cp .env.example .env
-bun run dev
+bun run dev          # build dashboard lalu jalankan server dengan watch
+bun test             # jalankan tes
+bun run build        # build dashboard
+bun run schema:tokens
 ```
 
-Salin `.env.example` menjadi `.env`, lalu isi nilai yang diminta berkas itu. `bun run dev` membangun dashboard, lalu menjalankan `src/index.ts` dengan watch. Bun memuat `.env` sendiri.
-
-## Menghubungkan dari laptop
-
-Perintah laptop, tunnel, dan VPS yang lebih panjang ada di [docs/run.md](docs/run.md).
-
-`HOST=127.0.0.1` membuat proses hanya menerima koneksi di antarmuka loopback. Port tidak menerima koneksi dari antarmuka lain.
-
-```bash
-HOST=127.0.0.1 PORT=3000 PUBLIC_BASE_URL=http://127.0.0.1:3000 bun run start
-```
-
-`bun run start` membangun dashboard, lalu menjalankan proses yang sama. Skrip `start` di `package.json` menjalankan `bun run build`, lalu `bun src/index.ts`.
-
-### Hostname publik
-
-Server tetap di laptop, pada `127.0.0.1:3000`. Kalau dashboard atau klien dibuka dari origin publik, set `PUBLIC_BASE_URL` ke origin `https://` itu dan arahkan tunnel ke port lokal. Konektor chat yang minta URL server memakai `https://host/mcp`. `host` pada URL itu adalah hostname `PUBLIC_BASE_URL`.
-
-Hostname publik itu boleh berasal dari Cloudflare. Repo ini tidak menuliskan perintah untuk membuat tunnel tersebut. Setelah hostname hidup, isi `PUBLIC_BASE_URL` seperti di atas.
-
-Kalau header `Host` berbeda dari hostname origin itu, isi `ALLOWED_HOSTS` dengan hostname tersebut, dipisah koma bila ada lebih dari satu. Daftar yang sama dipakai untuk header `Host` dan `Origin`, jadi `/assets` dan favicon bisa dimuat tanpa sesi dashboard. `TRUST_PROXY=true` membuat IP klien dibaca dari header proxy untuk batas percobaan login.
-
-Cloudflare Access tidak boleh membatasi `/mcp` ke perangkat operator saja. Pemanggil tool adalah server OpenAI atau Anthropic, bukan browser operator.
-
-### OpenAI Secure MCP Tunnel
-
-OpenAI Secure MCP Tunnel memakai `tunnel-client`. Klien itu membuka HTTPS keluar ke OpenAI dan meneruskan permintaan MCP ke URL lokal. Ambil `tunnel_id` dari Platform tunnel settings, lalu jalankan klien di mesin yang sudah bisa mencapai server.
-
-```bash
-tunnel-client init --profile agent-mcp --tunnel-id "$TUNNEL_ID" --mcp-server-url http://127.0.0.1:3000/mcp && tunnel-client run --profile agent-mcp
-```
-
-Di ChatGPT, tambahkan MCP kustom dengan koneksi Tunnel dan `tunnel_id` yang sama.
-
-## Menghubungkan di VPS
-
-Jalankan proyek ini di server. `bun` harus ada di PATH. `bun install` sekali. Nama domain atau subdomain adalah hostname publik. Reverse proxy meneruskan ke `127.0.0.1`. `PUBLIC_BASE_URL` harus `https://` dan sama dengan nama host publik. `TRUST_PROXY=true` membuat protokol dan IP klien dibaca dari header proxy.
-
-```bash
-HOST=127.0.0.1 PORT=3000 TRUST_PROXY=true PUBLIC_BASE_URL=https://mcp.example.com bun run start
-```
-
-Ganti `mcp.example.com` dengan domain atau subdomain server. Perintah itu memakai skrip `start` di `package.json`. Konektor memakai `https://host/mcp` dengan hostname yang sama.
-
-Cloudflare Access tidak boleh membatasi `/mcp` ke perangkat operator saja. Pemanggil tool adalah server OpenAI atau Anthropic, bukan browser operator.
-
-### PM2
-
-`.env.production` terpisah dari `.env`. `bun run dev` tetap memakai `.env`.
-
-Salin `.env.production.example` menjadi `.env.production`, lalu isi nilainya. `DASHBOARD_EMAIL`, `DASHBOARD_PASSWORD` minimal 12 karakter, dan `BETTER_AUTH_SECRET` minimal 32 karakter wajib diisi. Contoh `DATABASE_PATH` adalah `./data/prod.sqlite`. Operator boleh mengganti path itu. Isi `PUBLIC_BASE_URL` dengan origin HTTPS publik. `TRUST_PROXY=true` bila proses di belakang tunnel atau reverse proxy.
-
-`ecosystem.config.json` menjalankan `bun --no-env-file --env-file=.env.production run start:prod`. Skrip `start:prod` di `package.json` membangun dashboard tanpa memuat `.env` dev, lalu menjalankan `src/index.ts` dengan `.env.production`.
-
-```bash
-pm2 start ecosystem.config.json
-pm2 reload ecosystem.config.json
-pm2 logs agent-mcp
-```
+Server memakai **Bun, TypeScript, Hono, MCP SDK, Better Auth, SQLite**, serta dashboard **React, Vite, dan Tailwind CSS**. Struktur dan keputusan teknis dijelaskan di [arsitektur](docs/architecture.md).
 
 ## Lisensi
 
-Lisensi MIT. Teks lengkap ada di [LICENSE](LICENSE).
-
-## Kontribusi
-
-Cara mengubah kode ada di [CONTRIBUTING.md](CONTRIBUTING.md).
+[MIT](LICENSE). Kontribusi diterima melalui pull request dengan panduan di [CONTRIBUTING.md](CONTRIBUTING.md).
