@@ -1,4 +1,5 @@
 import { resourceBytes, resourceResponse } from "../resources.ts";
+import { autostartStatus, enableAutostart, disableAutostart, isStandaloneBinary } from "../cli/autostart.ts";
 import type { Database } from "bun:sqlite";
 import type { Context, Hono } from "hono";
 import { KeyValidationError, createApiKey, revokeApiKey } from "../auth/keys.ts";
@@ -66,6 +67,24 @@ export function registerDashboard(app: Hono, db: Database, operator: OperatorChe
        ORDER BY last_used_at DESC`,
     ).all(since);
     return ok(c, { api_keys: apiKeys, oauth });
+  });
+
+  app.get("/api/autostart", async (c) => {
+    if (!(await operator(c))) return fail(c, 401, "unauthorized", "Sign in required");
+    return ok(c, { ...await autostartStatus(), supported: isStandaloneBinary() });
+  });
+
+  app.post("/api/autostart", async (c) => {
+    if (!(await operator(c))) return fail(c, 401, "unauthorized", "Sign in required");
+    if (!isStandaloneBinary()) return fail(c, 409, "standalone_required", "Autostart requires the installed standalone CLI");
+    const body = await c.req.json().catch(() => null) as { enabled?: unknown } | null;
+    if (typeof body?.enabled !== "boolean") return fail(c, 400, "validation_error", "enabled must be a boolean");
+    try {
+      const state = body.enabled ? await enableAutostart() : await disableAutostart();
+      return ok(c, state);
+    } catch (error) {
+      return fail(c, 500, "autostart_failed", error instanceof Error ? error.message : "Autostart failed");
+    }
   });
 
   app.get("/api/settings", async (c) => {

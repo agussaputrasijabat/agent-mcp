@@ -79,6 +79,7 @@ async function interactiveSetup() {
   let emailSent = false;
   let passwordSent = false;
   let confirmationSent = false;
+  let autostartDeclined = false;
   const child = Bun.spawn([process.execPath, "--no-env-file", join(import.meta.dir, "../src/cli/main.ts"), "setup"], {
     cwd: directory,
     env: { ...process.env, AGENT_MCP_HOME: directory },
@@ -98,6 +99,10 @@ async function interactiveSetup() {
           confirmationSent = true;
           terminal.write("setup-password-123\r");
         }
+        if (!autostartDeclined && output.includes("Jalankan otomatis saat login komputer")) {
+          autostartDeclined = true;
+          terminal.write("n\r");
+        }
       },
     },
   });
@@ -106,6 +111,7 @@ async function interactiveSetup() {
     expect(await child.exited, output).toBe(0);
     expect(passwordSent).toBe(true);
     expect(confirmationSent).toBe(true);
+    expect(autostartDeclined).toBe(true);
     expect(output).not.toContain("setup-password-123");
   } finally {
     clearTimeout(timeout);

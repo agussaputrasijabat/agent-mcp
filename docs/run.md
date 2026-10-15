@@ -32,6 +32,26 @@ agent-mcp stop
 
 `config show` menyembunyikan auth secret. `auth reset-password` meminta password baru secara interaktif dan konfirmasi. Akun tetap dapat login selama menggunakan database dan secret yang sama. Jangan bagikan file `config.json` atau database operator.
 
+### Jalankan otomatis saat login komputer
+
+Saat setup pertama, CLI menawarkan opsi **Jalankan otomatis saat login komputer? (y/N)**. Default **tidak aktif** dan hanya berlaku setelah pengguna menyetujuinya. Pengaturan yang sama bisa diubah lewat halaman **Pengaturan** pada dashboard standalone atau perintah:
+
+```bash
+agent-mcp autostart status
+agent-mcp autostart enable
+agent-mcp autostart disable
+```
+
+Autostart baru berlaku **pada login OS berikutnya**, tidak langsung menjalankan ulang server. `disable` tidak menghentikan server yang sedang berjalan; gunakan `agent-mcp stop` untuk menghentikannya.
+
+- **macOS:** LaunchAgent milik pengguna, `~/Library/LaunchAgents/com.agent-mcp.server.plist`. `launchd` menjalankan `--foreground` saat login dan mengulang proses yang crash (bukan shutdown normal).
+- **Windows:** entri `HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run` memanggil PowerShell terproteksi yang menjalankan binary tanpa jendela console dan mencoba ulang setelah crash. Tidak perlu akses admin.
+- **Linux:** unit `~/.config/systemd/user/agent-mcp.service` diaktifkan pada `default.target` bila `systemd --user` tersedia. Jika tidak ada user manager systemd, CLI menggunakan `~/.config/autostart/agent-mcp.desktop` untuk desktop yang kompatibel XDG Autostart. Tidak membutuhkan `sudo` atau `loginctl enable-linger`.
+
+Autostart hanya bekerja dengan binary standalone yang sudah diinstal; CLI yang dijalankan dari source Bun tidak akan mendaftarkan aplikasi. Pendaftaran menyimpan path executable hasil instalasi npm dan lokasi data, **bukan secret**. Bila path binary berubah karena pindah lokasi instalasi, jalankan `agent-mcp autostart enable` lagi dari binary baru. Fitur ini tidak mengaktifkan server sebagai layanan root/sistem sebelum login. Pada Windows, PowerShell dan Windows Run key mengikuti kebijakan lokal; di Linux tanpa desktop/session manager yang sesuai, fallback XDG tidak dapat digunakan.
+
+**Keamanan:** Agent MCP dapat mengakses file dan shell akun pengguna. Jangan aktifkan autostart pada komputer bersama tanpa memahami risikonya. Autostart tidak mengubah status tunnel: akses publik tetap harus dikonfigurasi terpisah.
+
 Lokasi penyimpanan: `~/Library/Application Support/agent-mcp/` pada macOS, `%APPDATA%\\agent-mcp\\` pada Windows, atau `~/.local/share/agent-mcp/` pada Linux. Variabel `AGENT_MCP_HOME` dapat mengubahnya secara eksplisit. CLI lokal hanya mendengarkan pada `127.0.0.1`; koneksi ChatGPT/Claude dari cloud membutuhkan tunnel HTTPS terpisah. Paket uji lokal hanya berisi binary untuk platform saat build, belum rilis npm multi-platform.
 
 ## Persiapan

@@ -15,8 +15,23 @@ test("operator routes manage keys, clients, settings, memory, and skills", async
   const anon = await app.request("/api/api-keys", { headers: { host: "127.0.0.1" } });
   expect(anon.status).toBe(401);
 
+  const autostartAnon = await app.request("/api/autostart", { headers: { host: "127.0.0.1" } });
+  expect(autostartAnon.status).toBe(401);
+
   const cookie = await signIn(app);
   const auth = { ...headers, cookie };
+  const autostartStatus = await app.request("/api/autostart", { headers: { host: "127.0.0.1", cookie } });
+  expect(autostartStatus.status).toBe(200);
+  const autostartBody = await autostartStatus.json() as { data: { supported: boolean } };
+  expect(autostartBody.data.supported).toBe(false);
+  const unauthorizedChange = await app.request("/api/autostart", {
+    method: "POST", headers, body: JSON.stringify({ enabled: true }),
+  });
+  expect(unauthorizedChange.status).toBe(401);
+  const unsupportedChange = await app.request("/api/autostart", {
+    method: "POST", headers: auth, body: JSON.stringify({ enabled: true }),
+  });
+  expect(unsupportedChange.status).toBe(409);
   const readHeaders = { host: "127.0.0.1", cookie };
   const emptyName = await app.request("/api/api-keys", { method: "POST", headers: auth, body: JSON.stringify({ name: "" }) });
   expect(emptyName.status).toBe(400);

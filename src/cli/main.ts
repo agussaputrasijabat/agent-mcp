@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { configPath, readConfig, saveConfig, newSecret, type CliConfig } from "./config.ts";
 import { isPortAvailable, selectFirstRunPort, DEFAULT_CLI_PORT } from "./ports.ts";
+import { autostartStatus, enableAutostart, disableAutostart } from "./autostart.ts";
 import { openDatabase } from "../db/database.ts";
 import { replaceOperatorPassword } from "../auth/operator.ts";
 import { dataDirectory } from "./paths.ts";
@@ -74,12 +75,29 @@ async function setup(): Promise<CliConfig> {
   const config = current ?? { email, secret: newSecret(), port: await selectFirstRunPort() };
   await completeSetup(config, password);
   console.log(`Setup selesai. Dashboard: ${endpoint(config)}`);
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    const answer = (await rl.question("Jalankan otomatis saat login komputer? (y/N): ")).trim().toLowerCase();
+    if (answer === "y" || answer === "ya") {
+      try {
+        await enableAutostart();
+        console.log("Autostart diaktifkan. Berlaku saat login berikutnya.");
+      } catch (error) {
+        console.error(`Autostart belum aktif: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+  } finally { rl.close(); }
   return config;
 }
 
 async function runServer(): Promise<void> {
   const config = readConfig();
   if (!config) throw new Error("run_setup_first");
+  const running = readInstance();
+  if (running && await requestControl(config, running, "GET")) {
+    console.log("Agent MCP sudah berjalan pada instance lain.");
+    return;
+  }
   process.env.HOST = "127.0.0.1";
   process.env.PORT = String(config.port);
   process.env.DATABASE_PATH = join(dataDirectory(), "agent.sqlite");
@@ -200,15 +218,39 @@ async function resetPassword(): Promise<void> {
   console.log("Password operator berhasil diperbarui.");
 }
 
+async function autostartCommand(): Promise<void> {
+  const action = process.argv[3] ?? "status";
+  if (action === "status") {
+    const state = await autostartStatus();
+    console.log(`Autostart: ${state.enabled ? "ON" : "OFF"} (${state.provider})`);
+    if (state.enabled) console.log(`Konfigurasi: ${state.path}`);
+    return;
+  }
+  if (action === "enable") {
+    const config = readConfig();
+    if (!config || !operatorReady(config)) throw new Error("run_setup_first");
+    const state = await enableAutostart();
+    console.log(`Autostart ${state.enabled ? "diaktifkan" : "gagal"} (${state.provider}). Berlaku saat login berikutnya.`);
+    return;
+  }
+  if (action === "disable") {
+    const state = await disableAutostart();
+    console.log(`Autostart ${state.enabled ? "masih aktif" : "dinonaktifkan"}. Server yang sedang berjalan tidak dihentikan.`);
+    return;
+  }
+  throw new Error("usage: agent-mcp autostart [enable|disable|status]");
+}
+
 async function main(): Promise<void> {
   if (command === "__serve") return runServer();
   if (command === "--help" || command === "help") {
-    console.log(`agent-mcp [start|stop|restart|status|logs|open|setup|config|auth reset-password|--foreground|--version]\nPort instalasi baru: ${DEFAULT_CLI_PORT} (fallback otomatis jika terpakai)`);
+    console.log(`agent-mcp [start|stop|restart|status|logs|open|setup|config|autostart|auth reset-password|--foreground|--version]\nPort instalasi baru: ${DEFAULT_CLI_PORT} (fallback otomatis jika terpakai)`);
     return;
   }
   if (command === "--version" || command === "version") { console.log("agent-mcp 1.0.0"); return; }
   if (command === "setup") { await setup(); return; }
   if (command === "config") return configCommand();
+  if (command === "autostart") return autostartCommand();
   if (command === "auth" && process.argv[3] === "reset-password") return resetPassword();
   if (command === "start") return start();
   if (command === "stop") return stop();

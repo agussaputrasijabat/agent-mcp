@@ -54,6 +54,9 @@ agent-mcp config show
 agent-mcp config set port auto
 agent-mcp config set port 47832
 agent-mcp auth reset-password
+agent-mcp autostart status
+agent-mcp autostart enable
+agent-mcp autostart disable
 agent-mcp stop
 ```
 

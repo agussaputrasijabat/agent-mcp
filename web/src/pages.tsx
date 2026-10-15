@@ -198,12 +198,41 @@ type Settings = {
   shell_timeout_max_ms: number;
 };
 
+type AutostartState = { enabled: boolean; supported: boolean; provider: string; path: string };
+
 export function SettingsPage() {
   const [form, setForm] = useState<Settings | null>(null);
   const [savedUrl, setSavedUrl] = useState("");
   const [failed, setFailed] = useState(false);
   const [message, setMessage] = useState("");
   const [notice, setNotice] = useState("");
+  const [autostart, setAutostart] = useState<AutostartState | null>(null);
+  const [autostartPending, setAutostartPending] = useState(false);
+  const [autostartMessage, setAutostartMessage] = useState("");
+
+  useEffect(() => {
+    api<AutostartState>("/api/autostart").then((result) => {
+      if (result.ok) setAutostart(result.data);
+      else setAutostartMessage(result.message);
+    }).catch(() => setAutostartMessage("Gagal memuat status autostart."));
+  }, []);
+
+  async function toggleAutostart() {
+    if (!autostart || !autostart.supported || autostartPending) return;
+    setAutostartPending(true);
+    setAutostartMessage("");
+    try {
+      const result = await api<AutostartState>("/api/autostart", {
+        method: "POST", body: JSON.stringify({ enabled: !autostart.enabled }),
+      });
+      if (result.ok) {
+        setAutostart(result.data);
+        setAutostartMessage("Perubahan berlaku mulai login komputer berikutnya.");
+      } else setAutostartMessage(result.message);
+    } catch {
+      setAutostartMessage("Gagal mengubah pengaturan autostart.");
+    } finally { setAutostartPending(false); }
+  }
 
   function load() {
     setFailed(false);
@@ -246,6 +275,7 @@ export function SettingsPage() {
   }
 
   return (
+    <div className="flex flex-col gap-4">
     <Card>
       <CardHeader>
         <CardTitle><h1>Pengaturan</h1></CardTitle>
@@ -284,6 +314,31 @@ export function SettingsPage() {
         ) : null}
       </CardContent>
     </Card>
+    <Card>
+      <CardHeader>
+        <CardTitle>Jalankan saat login</CardTitle>
+        <CardDescription>Agent MCP dapat berjalan otomatis saat kamu masuk ke komputer. Default nonaktif dan tidak membutuhkan hak administrator.</CardDescription>
+      </CardHeader>
+      <CardContent className="flex max-w-xl flex-col gap-3">
+        {autostart ? (
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="font-medium">Autostart</p>
+              <p className="text-sm text-muted-foreground">{autostart.provider} · {autostart.enabled ? "Aktif" : "Nonaktif"}</p>
+            </div>
+            <button
+              type="button" role="switch" aria-label="Jalankan Agent MCP saat login"
+              aria-checked={autostart.enabled} disabled={!autostart.supported || autostartPending}
+              onClick={toggleAutostart}
+              className={`relative h-6 w-11 shrink-0 rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-40 ${autostart.enabled ? "bg-primary" : "bg-muted-foreground/40"}`}
+            ><span className={`absolute top-0.5 left-0.5 size-5 rounded-full bg-background shadow-sm transition-transform ${autostart.enabled ? "translate-x-5" : ""}`} /></button>
+          </div>
+        ) : <p className="text-sm text-muted-foreground">Memeriksa status autostart…</p>}
+        {autostart && !autostart.supported ? <p className="text-sm text-muted-foreground">Fitur ini tersedia setelah Agent MCP diinstal dari binary standalone, bukan server development.</p> : null}
+        {autostartMessage ? <p className="text-sm text-muted-foreground" role="status">{autostartMessage}</p> : null}
+      </CardContent>
+    </Card>
+    </div>
   );
 }
 
