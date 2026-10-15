@@ -1,5 +1,5 @@
 import { createMcpHandler, McpServer } from "@modelcontextprotocol/server";
-import { requireApproval, sensitivePath } from "../security/approval.ts";
+import { sensitivePath } from "../security/sensitive-path.ts";
 import type { Database } from "bun:sqlite";
 import { beginToolCall, finishToolCall, type ToolMeta } from "../db/tool-calls.ts";
 import { readSettings, type Settings } from "../db/settings.ts";
@@ -77,12 +77,6 @@ function traced<T>(db: Database, name: string, args: T, ctx: ToolMeta, run: () =
     });
 }
 
-function guarded<T extends Record<string, unknown>>(
-  db: Database, name: string, args: T, ctx: ToolMeta, run: () => ToolResult | Promise<ToolResult>,
-) {
-  return traced(db, name, args, ctx, () => requireApproval(db, name, args) ?? run());
-}
-
 export function createHostHandler(options: {
   db: Database;
   instructions: string;
@@ -112,16 +106,16 @@ export function createHostHandler(options: {
     server.registerTool(
       "write_file",
       {
-        description: "Create or atomically replace a UTF-8 file. Use expected_hash from read_file to reject concurrent changes, or 'absent' for new files. Sensitive paths require operator approval.",
+        description: "Create or atomically replace a UTF-8 file. Use expected_hash from read_file to reject concurrent changes, or 'absent' for new files. The client decides whether to confirm this write action.",
         inputSchema: writeFileInput,
         annotations: writeAnnotations,
       },
-      async (input, ctx) => guarded(db, "write_file", input, ctx, () => writeFile(input)),
+      async (input, ctx) => traced(db, "write_file", input, ctx, () => writeFile(input)),
     );
     server.registerTool(
       "edit_file",
       { description: "Atomically replace one exact string in a UTF-8 file. Read with include_hash=true and pass expected_hash to prevent stale edits.", inputSchema: editFileInput, annotations: writeAnnotations },
-      async (input, ctx) => guarded(db, "edit_file", input, ctx, () => editFile(input)),
+      async (input, ctx) => traced(db, "edit_file", input, ctx, () => editFile(input)),
     );
     server.registerTool(
       "glob",
@@ -136,12 +130,12 @@ export function createHostHandler(options: {
     server.registerTool(
       "shell",
       {
-        description: "Run a bash command on the host. Risky operations can return approval_required; the operator approves at /approvals, then retry with the same arguments and approval_id.",
+        description: "Run a bash command on the host. Execute a Bash command on this host. Client-side tool confirmation applies according to ChatGPT or Claude permissions.",
         inputSchema: shellInput,
         annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
       },
       async (input, ctx) =>
-        guarded(db, "shell", input, ctx, () =>
+        traced(db, "shell", input, ctx, () =>
           runShell(input, gate, {
             timeoutMs: limits().shell_timeout_ms ?? SHELL_TIMEOUT_MS,
             timeoutMaxMs: limits().shell_timeout_max_ms ?? SHELL_TIMEOUT_MAX_MS,
@@ -170,7 +164,7 @@ export function createHostHandler(options: {
     server.registerTool(
       "memory_forget",
       { description: "Delete one note by key.", inputSchema: memoryForgetInput, annotations: deleteAnnotations },
-      async (input, ctx) => guarded(db, "memory_forget", input, ctx, () => memoryForget(db, input)),
+      async (input, ctx) => traced(db, "memory_forget", input, ctx, () => memoryForget(db, input)),
     );
     server.registerTool(
       "skill_list",
@@ -206,7 +200,7 @@ export function createHostHandler(options: {
         inputSchema: skillDeleteInput,
         annotations: deleteAnnotations,
       },
-      async (input, ctx) => guarded(db, "skill_delete", input, ctx, () => skillDelete(db, input)),
+      async (input, ctx) => traced(db, "skill_delete", input, ctx, () => skillDelete(db, input)),
     );
     return server;
   });

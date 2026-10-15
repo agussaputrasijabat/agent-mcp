@@ -217,7 +217,6 @@ type Settings = {
   shell_concurrency_limit: number;
   shell_timeout_ms: number;
   shell_timeout_max_ms: number;
-  shell_policy: "risky" | "strict";
 };
 
 type AutostartState = { enabled: boolean; supported: boolean; provider: string; path: string };
@@ -285,7 +284,6 @@ export function SettingsPage() {
         shell_concurrency_limit: Number(form.shell_concurrency_limit),
         shell_timeout_ms: Number(form.shell_timeout_ms),
         shell_timeout_max_ms: Number(form.shell_timeout_max_ms),
-        shell_policy: form.shell_policy,
       }),
     });
     if (!result.ok) {
@@ -329,16 +327,9 @@ export function SettingsPage() {
                 <FieldLabel htmlFor="shell-timeout-max">Timeout maksimum</FieldLabel>
                 <Input id="shell-timeout-max" min={1} type="number" value={form.shell_timeout_max_ms} onChange={(event) => setForm({ ...form, shell_timeout_max_ms: Number(event.target.value) })} />
               </Field>
-              <Field className="md:col-span-3">
-                <FieldLabel htmlFor="shell-policy">Kebijakan approval shell</FieldLabel>
-                <select id="shell-policy" value={form.shell_policy}
-                  onChange={(event) => setForm({ ...form, shell_policy: event.target.value as Settings["shell_policy"] })}
-                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-2 focus-visible:outline-ring">
-                  <option value="risky">Standar — minta approval untuk pola berisiko</option>
-                  <option value="strict">Ketat — semua perintah shell perlu approval</option>
-                </select>
-                <p className="text-xs leading-5 text-muted-foreground">Mode Standar tidak bisa mendeteksi semua cara eksekusi shell. Gunakan mode Ketat jika klien atau kode yang dibaca tidak sepenuhnya dipercaya.</p>
-              </Field>
+              <p className="md:col-span-3 text-xs leading-5 text-muted-foreground">
+                Konfirmasi penggunaan tool dikelola oleh ChatGPT atau Claude. Atur izin tool di aplikasi klien.
+              </p>
               <div className="flex flex-col items-start gap-3 md:col-span-3">
                 <Button type="submit">Simpan perubahan</Button>
                 {saved ? <p className="text-sm text-primary" role="status">Pengaturan berhasil disimpan.</p> : null}

@@ -74,6 +74,12 @@ Setelah konektor berhasil dibuat:
 
 Template sumber tersedia di [`prompts/project-instructions.md`](../prompts/project-instructions.md). Path proyek membantu AI menentukan lokasi file; ini bukan sandbox atau pembatas akses.
 
+## Konfirmasi tool langsung di ChatGPT atau Claude
+
+Server tidak meminta persetujuan dari halaman dashboard. Tool yang bisa mengubah data, terutama `shell`, `write_file`, `edit_file`, `memory_forget`, dan `skill_delete`, diberi anotasi MCP sebagai tindakan berpotensi destruktif. Jika klien menampilkan dialog izin pemanggilan tool, tinjau argumen lalu pilih izinkan atau tolak **di aplikasi klien**. Tidak ada langkah ulang dengan `approval_id`.
+
+ChatGPT menentukan permintaan konfirmasi berdasarkan izin aplikasi dan konteks; Claude juga dapat mengatur izin per tool. Perilakunya tidak selalu sama dan tidak bisa dipaksakan oleh server hanya melalui anotasi. Hindari pengaturan "selalu izinkan" bila menghubungkan host berisi data sensitif, dan jalankan server menggunakan akun OS dengan hak akses minimal.
+
 ## Uji koneksi
 
 Minta klien:

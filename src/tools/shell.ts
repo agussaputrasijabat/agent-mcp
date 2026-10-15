@@ -39,7 +39,6 @@ export const shellInput = z.object({
   command: z.string(),
   cwd: z.string().optional(),
   timeout_ms: z.number().int().optional(),
-  approval_id: z.string().uuid().optional(),
 });
 
 export class ShellGate {

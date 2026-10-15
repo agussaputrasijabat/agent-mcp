@@ -7,8 +7,8 @@ Seluruh tool di bawah ini tersedia melalui `/mcp`. Path file dan direktori harus
 | Tool | Input | Perilaku |
 | --- | --- | --- |
 | `read_file` | `path`, opsional `offset`, `limit`, `include_hash` | Membaca UTF-8 atau gambar. `include_hash: true` menambahkan SHA-256 untuk mengamankan edit berikutnya. |
-| `write_file` | `path`, `contents`, opsional `expected_hash`, `approval_id` | Menulis melalui temp file dan atomic rename. `expected_hash` menolak file yang berubah; nilai `absent` berarti file harus belum ada. |
-| `edit_file` | `path`, `old_string`, `new_string`, opsional `expected_hash`, `approval_id` | Exact match unik, penulisan atomik, dan pemeriksaan versi opsional. Menolak perubahan terhadap symlink. |
+| `write_file` | `path`, `contents`, opsional `expected_hash` | Menulis melalui temp file dan atomic rename. `expected_hash` menolak file yang berubah; nilai `absent` berarti file harus belum ada. |
+| `edit_file` | `path`, `old_string`, `new_string`, opsional `expected_hash` | Exact match unik, penulisan atomik, dan pemeriksaan versi opsional. Menolak perubahan terhadap symlink. |
 | `glob` | `pattern`, opsional `path` | Mencari path sesuai glob; maksimum 200 hasil. |
 | `grep` | `pattern` (regex), opsional `path`, `glob` | Mencari baris teks; maksimum 100 kecocokan. |
 
@@ -44,14 +44,13 @@ Menjalankan `bash -lc` pada host.
 - Timeout default 120.000 ms, minimum 1.000 ms, maksimum default 600.000 ms. Operator dapat mengubah batasnya di Pengaturan.
 - Maksimum 32 perintah shell berjalan bersamaan secara default. Perintah berikutnya mengembalikan `shell_busy` jika batas tercapai.
 - Kode keluar dan output dikembalikan sebagai teks. Pembacaan stdout/stderr dibatasi selama proses berjalan sehingga output besar tidak dibuffer seluruhnya di RAM. Saat timeout, server mencoba menghentikan process group pada macOS/Linux.
-- Mode approval shell dapat diatur melalui **Pengaturan**: `strict` (default, semua perintah shell meminta approval) atau `risky` (opt-in, hanya memeriksa pola yang diketahui berisiko). `AGENT_MCP_SHELL_POLICY=strict` juga dapat memaksakan mode ketat.
-- Mode `risky` bersifat heuristik dan **tidak bisa menjadi sandbox bagi shell arbitrer**. Perintah terselubung atau script bisa melewati pemeriksaan pola; gunakan mode `strict` dan user OS terisolasi untuk tingkat kepercayaan rendah.
+- Konfirmasi penggunaan shell dilakukan melalui antarmuka izin tool bawaan klien. Pilihan tombol dan frekuensi dialog bergantung pada aplikasi ChatGPT atau Claude, bukan server.
 
-### Approval server-side
+### Persetujuan bawaan klien
 
-Saat tool yang dilindungi mengembalikan `error approval_required`, eksekusi **belum dilakukan**. Operator membuka halaman **Persetujuan** (`/approvals`) di dashboard, meninjau perintah dan asal klien, lalu memilih **Izinkan sekali** atau **Tolak**. Jika diizinkan, klien mengulang tool yang **sama persis**, menambahkan `approval_id` dari hasil error. ID hanya dapat digunakan sekali, terikat pada autentikasi pemanggil dan hash argumen, serta kedaluwarsa setelah lima menit. Bila permintaan berubah, approval lama ditolak.
+Agent MCP menandai tool yang bisa mengubah data dengan anotasi MCP seperti `readOnlyHint: false` dan `destructiveHint: true`. ChatGPT/Claude dapat menampilkan dialog konfirmasi sebelum pemanggilan tool. Tidak ada langkah `approval_id`, persetujuan lewat dashboard, atau MCP Elicitation dari server.
 
-Approval diterapkan pada operasi shell yang terdeteksi berisiko, perubahan file sensitif (`.env`, kredensial, kunci), `memory_forget`, dan `skill_delete`. Tidak memerlukan dukungan MCP Elicitation di sisi klien. Dashboard menampilkan pratinjau shell sementara; hanya ringkasan/hash perintah yang disimpan dalam SQLite. Untuk file sensitif, operator melihat operasi, ukuran dan nama key yang berubah tanpa nilainya. Setelah restart, approval lama tanpa pratinjau tidak bisa disetujui sampai agen mengirim ulang. Mode `strict` mengharuskan persetujuan untuk setiap panggilan shell, tetapi bukan sandbox OS.
+**Penting:** Anotasi adalah petunjuk bagi klien, bukan jaminan dialog. Klien dapat menyimpan izin untuk percakapan atau memanggil tool tanpa bertanya, tergantung pengaturan dan kebijakan. Jika membutuhkan izin setiap kali, atur di aplikasi klien. Server tetap membatasi akses lewat API key/OAuth, hak akses OS, dan validasi input.
 
 ### `web_fetch`
 
@@ -69,7 +68,7 @@ Tool ini bukan mesin pencari web. Untuk pencarian situs atau dokumentasi publik,
 | --- | --- | --- |
 | `memory_search` | `query` (1–200 karakter), opsional `project_path` | Mencari sampai 20 catatan yang cocok. |
 | `memory_save` | `key`, `body`, opsional `project_path` | Menambah atau mengganti catatan dengan key yang sama. |
-| `memory_forget` | `key`, opsional `project_path`, `approval_id` | Menghapus catatan pada scope yang tepat (global bila `project_path` tidak diberikan). Perlu approval operator. |
+| `memory_forget` | `key`, opsional `project_path` | Menghapus catatan pada scope yang tepat (global bila `project_path` tidak diberikan). Konfirmasi diatur oleh klien. |
 
 Key memori menggunakan huruf kecil, angka, dan tanda hubung (maksimum 64 karakter). Isi maksimum 8.000 karakter, dengan batas 1.000 catatan di database. `project_path` harus absolut jika dipakai.
 
@@ -90,7 +89,7 @@ Key memori menggunakan huruf kecil, angka, dan tanda hubung (maksimum 64 karakte
 | `skill_list` | Opsional `project_path` | Mendaftar skill database; dengan path proyek, juga menampilkan skill repository. |
 | `skill_read` | `name`, opsional `source`, `project_path` | Membaca skill database; untuk skill repo gunakan `source: "repo"` dan `project_path`. |
 | `skill_save` | `name`, `description`, `body`, opsional `project_path` | Membuat atau memperbarui skill database. |
-| `skill_delete` | `name`, opsional `project_path`, `approval_id` | Menghapus skill database setelah approval operator. |
+| `skill_delete` | `name`, opsional `project_path` | Menghapus skill database; konfirmasi diatur oleh klien. |
 
 Skill database dibatasi 200 entri. Nama skill memakai huruf kecil, angka, dan tanda hubung. Deskripsi maksimum 200 karakter dan body maksimum 32.000 karakter.
 

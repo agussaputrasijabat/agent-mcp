@@ -31,7 +31,6 @@ export const writeFileInput = z.object({
   path: z.string(),
   contents: z.string(),
   expected_hash: fileVersion.optional(),
-  approval_id: z.string().uuid().optional(),
 });
 
 export const editFileInput = z.object({
@@ -39,7 +38,6 @@ export const editFileInput = z.object({
   old_string: z.string().min(1),
   new_string: z.string(),
   expected_hash: fileVersion.optional(),
-  approval_id: z.string().uuid().optional(),
 });
 
 export const globInput = z.object({

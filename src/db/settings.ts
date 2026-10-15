@@ -11,21 +11,21 @@ export type Settings = {
   shell_concurrency_limit: number;
   shell_timeout_ms: number;
   shell_timeout_max_ms: number;
-  shell_policy: "risky" | "strict";
   output_char_limit: number;
 };
 
 const settingsCache = new WeakMap<Database, Settings>();
+const selectSettings = "SELECT public_base_url, shell_concurrency_limit, shell_timeout_ms, shell_timeout_max_ms, output_char_limit FROM settings WHERE id = 1";
 
 function querySettings(db: Database): Settings {
-  const row = db.query("SELECT * FROM settings WHERE id = 1").get() as Settings | null;
+  const row = db.query(selectSettings).get() as Settings | null;
   if (!row) throw new Error("settings_missing");
   settingsCache.set(db, row);
   return row;
 }
 
 export function ensureSettings(db: Database, publicBaseUrl: string): Settings {
-  const existing = db.query("SELECT * FROM settings WHERE id = 1").get() as Settings | null;
+  const existing = db.query(selectSettings).get() as Settings | null;
   if (existing) {
     settingsCache.set(db, existing);
     return existing;
@@ -57,7 +57,6 @@ export function updateSettings(db: Database, patch: Record<string, unknown>): Se
     shell_concurrency_limit: current.shell_concurrency_limit,
     shell_timeout_ms: current.shell_timeout_ms,
     shell_timeout_max_ms: current.shell_timeout_max_ms,
-    shell_policy: current.shell_policy,
   };
   if ("public_base_url" in patch) {
     if (typeof patch.public_base_url !== "string") throw new SettingsError("validation_error", "public_base_url must be a URL");
@@ -68,20 +67,14 @@ export function updateSettings(db: Database, patch: Record<string, unknown>): Se
   if ("shell_concurrency_limit" in patch) next.shell_concurrency_limit = integerField(patch.shell_concurrency_limit, 1, 128);
   if ("shell_timeout_ms" in patch) next.shell_timeout_ms = integerField(patch.shell_timeout_ms, 1000, 2_000_000_000);
   if ("shell_timeout_max_ms" in patch) next.shell_timeout_max_ms = integerField(patch.shell_timeout_max_ms, 1000, 2_000_000_000);
-  if ("shell_policy" in patch) {
-    if (patch.shell_policy !== "risky" && patch.shell_policy !== "strict") {
-      throw new SettingsError("validation_error", "shell_policy must be risky or strict");
-    }
-    next.shell_policy = patch.shell_policy;
-  }
   if (next.shell_timeout_ms > next.shell_timeout_max_ms) {
     throw new SettingsError("validation_error", "shell_timeout_ms cannot exceed shell_timeout_max_ms");
   }
   db.query(
     `UPDATE settings
-     SET public_base_url = ?, shell_concurrency_limit = ?, shell_timeout_ms = ?, shell_timeout_max_ms = ?, shell_policy = ?, updated_at = ?
+     SET public_base_url = ?, shell_concurrency_limit = ?, shell_timeout_ms = ?, shell_timeout_max_ms = ?, updated_at = ?
      WHERE id = 1`,
-  ).run(next.public_base_url, next.shell_concurrency_limit, next.shell_timeout_ms, next.shell_timeout_max_ms, next.shell_policy, new Date().toISOString());
+  ).run(next.public_base_url, next.shell_concurrency_limit, next.shell_timeout_ms, next.shell_timeout_max_ms, new Date().toISOString());
   settingsCache.delete(db);
   return readSettings(db);
 }

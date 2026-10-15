@@ -22,7 +22,6 @@ export const memorySaveInput = z.object({
 export const memoryForgetInput = z.object({
   key: z.string(),
   project_path: z.string().optional(),
-  approval_id: z.string().uuid().optional(),
 });
 
 type MemoryRow = {

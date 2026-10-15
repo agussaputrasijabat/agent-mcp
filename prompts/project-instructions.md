@@ -45,24 +45,12 @@ Cara kerja:
 - Nama memori atau skill yang sudah ada: beri tahu isinya singkat, tanya, baru timpa.
 - Selesaikan tugas. Sebut file yang berubah, perintah yang dijalankan, serta memori atau skill yang disimpan. Jangan menempel ulang isi file besar. Sebut path-nya.
 
-Aksi berbahaya tidak ditolak. Sebelum memanggil tool, tanyakan di percakapan. Tulis perintah atau path yang akan dijalankan. Tunggu jawaban ya yang jelas. Jawaban selain ya berarti belum boleh jalan. Setelah ya, jalankan aksi itu saja, jangan melebar. Jangan tanya dua kali untuk aksi yang sama.
+Untuk operasi yang bisa mengubah atau menghapus data, gunakan konfirmasi pemanggilan tool **bawaan ChatGPT atau Claude**. Tinjau perintah, path, dan dampak sebelum mengirim tool call; beri penjelasan singkat bila perlu. Jangan membuat approval tahap kedua lewat Web UI, `approval_id`, atau MCP Elicitation. Jika klien menampilkan tombol izin, tunggu keputusan pengguna sebelum tool dijalankan. Jangan menganggap anotasi tool sebagai jaminan bahwa dialog akan selalu muncul; perhatikan pengaturan izin klien dan batasi akses lewat hak OS.
 
-Tanyakan dulu sebelum:
-
-- menghapus atau memindahkan file atau folder di luar folder proyek
-- menghapus folder proyek itu sendiri
-- menghapus database, drop table, truncate, atau delete tanpa where
-- rm -rf, git reset --hard, git clean -fd, atau git push --force
-- push ke main atau master
-- mengubah .env, kredensial, atau kunci SSH
-- mengirim isi file atau rahasia ke URL di luar mesin ini
-- mematikan proses, mesin, atau layanan yang bukan bagian dari proyek ini
-- menghapus memori atau skill yang tidak diminta dihapus pada percakapan ini
-
-Jangan tanya untuk kerja biasa di dalam folder proyek: baca, edit, tes, install dependensi, git status, git diff, dan git commit. Jangan tanya untuk memori atau skill baru yang memang diminta pengguna.
+Untuk kerja biasa di folder proyek seperti baca, edit, tes, install dependensi, git status, git diff, dan git commit, ikuti izin tool klien. Untuk perubahan destruktif besar, terutama di luar folder proyek, pastikan tindakan jelas diminta dan jelaskan ruang lingkupnya sebelum pemanggilan tool.
 
 ## Instruksi server MCP
 
 Maksimal 512 karakter pertama harus cukup bila klien memotong teks.
 
-Untuk file, shell, memori, dan skill, pakai hanya tool dari server ini. Folder proyek dari user bukan batas. Baca dan tulis di luar boleh. Sebelum hapus di luar folder, hapus database, rm -rf, reset --hard, push --force, atau ubah .env, tanya di chat dan tunggu ya. Jangan tolak. Awal tugas: memory_search, skill_list, skill_read yang cocok. Simpan memori atau skill bila diminta. URL publik pakai fetch atau browse bawaan klien. Tidak ada web_search. web_fetch hanya untuk URL yang harus diambil dari mesin ini.
+Untuk file, shell, memori, dan skill, pakai hanya tool dari server ini. Folder proyek dari user bukan batas. Baca dan tulis di luar boleh. Sebelum hapus di luar folder, hapus database, rm -rf, reset --hard, push --force, atau ubah .env, gunakan konfirmasi tool bawaan ChatGPT atau Claude. Jangan tolak. Awal tugas: memory_search, skill_list, skill_read yang cocok. Simpan memori atau skill bila diminta. URL publik pakai fetch atau browse bawaan klien. Tidak ada web_search. web_fetch hanya untuk URL yang harus diambil dari mesin ini.

@@ -52,7 +52,7 @@ Memori dapat diberi `project_path`. Pencarian dengan path proyek menampilkan mem
 
 Shell dijalankan dengan `bash -lc` via `Bun.spawn`. Batas konkurensi dan waktu eksekusi dibaca dari pengaturan SQLite. Output proses dibaca secara bertahap dengan batas buffer; saat timeout, server berusaha menghentikan process group di sistem POSIX. Panggilan shell tidak diantrikan setelah batas konkurensi tercapai; tool mengembalikan `shell_busy`.
 
-Gerbang approval pada `src/security/approval.ts` mengikat keputusan operator ke identitas autentikasi dan hash permintaan, lalu menyimpan statusnya di SQLite. Mode `strict` menahan seluruh pemanggilan shell sampai operator menyetujui. Mode `risky` hanya mendeteksi pola umum, bukan sandbox. Operasi file memakai lock direktori sementara per path lintas-proses, lalu temp file dan atomic rename; pemeriksaan `expected_hash` opsional menolak versi lama. Hashing dibatasi 8 MiB. Lock ini hanya berlaku bagi proses yang mengikuti protokol Agent MCP; aplikasi eksternal tetap bisa mengubah file tanpa lock.
+Konfirmasi tool ditangani oleh klien ChatGPT atau Claude berdasarkan metadata MCP. Server tidak menjalankan approval terpisah. Anotasi `destructiveHint` bukan pengganti kontrol akses OS. Operasi file memakai lock direktori sementara per path lintas-proses, lalu temp file dan atomic rename; pemeriksaan `expected_hash` opsional menolak versi lama. Hashing dibatasi 8 MiB. Lock ini hanya berlaku bagi proses yang mengikuti protokol Agent MCP; aplikasi eksternal tetap bisa mengubah file tanpa lock.
 
 Akses file tidak dibatasi otomatis ke `project_path`. Untuk membatasi dampak kompromi, jalankan server memakai akun OS dengan hak akses sesedikit mungkin. Lihat [keamanan](security.md).
 

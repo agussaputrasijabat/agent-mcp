@@ -5,12 +5,11 @@ import { join } from "node:path";
 import { afterEach, expect, test } from "bun:test";
 import { createApiKey } from "../src/auth/keys.ts";
 import { openDatabase } from "../src/db/database.ts";
-import { updateSettings } from "../src/db/settings.ts";
-import { approvalReason } from "../src/security/approval.ts";
+import { sensitivePath } from "../src/security/sensitive-path.ts";
 import { editFile, readFile, writeFile } from "../src/tools/files.ts";
 import { memoryForget, memorySave, memorySearch } from "../src/tools/memory.ts";
 import { runShell, ShellGate } from "../src/tools/shell.ts";
-import { testApp, testOperator } from "./harness.ts";
+import { testApp } from "./harness.ts";
 import { postMcp } from "./mcp-client.ts";
 
 const directories: string[] = [];
@@ -103,15 +102,15 @@ test("atomic file writes do not replace symlink paths", () => {
   expect(readFileSync(target, "utf8")).toBe("unchanged");
 });
 
-test("approval recognizes a sensitive target behind a symlink alias", () => {
+test("sensitive file paths are recognized through symlink aliases", () => {
   if (process.platform === "win32") return;
   const directory = temp();
   const target = join(directory, "private.pem");
   const alias = join(directory, "plain.txt");
   writeFileSync(target, "private");
   symlinkSync(target, alias);
-  expect(approvalReason("write_file", { path: alias })).toBe("Perubahan file sensitif");
-  expect(approvalReason("edit_file", { path: alias })).toBe("Perubahan file sensitif");
+  expect(sensitivePath(alias)).toBe(true);
+  expect(sensitivePath(join(directory, "normal.txt"))).toBe(false);
 });
 
 test("memory keys are independent between global and project scopes", () => {
@@ -138,118 +137,76 @@ test("shell output is bounded before returning to the client", async () => {
   expect(result.content[0].text).toContain("[truncated]");
 });
 
-test("strict policy covers every shell command and audit redacts sensitive output", async () => {
+test("MCP exposes destructive hints and delegates confirmation to the client", async () => {
   const db = openDatabase(":memory:");
   const app = await testApp(db);
-  updateSettings(db, { shell_policy: "strict" });
-  const key = createApiKey(db, "strict").secret;
-  const command = await postMcp(app, "tools/call", { name: "shell", arguments: { command: "echo harmless" } }, key);
-  expect(command.body.result?.content?.[0]?.text).toContain("approval_required");
-  const directory = temp();
-  const path = join(directory, ".env");
-  writeFileSync(path, "PASSWORD=do-not-log");
-  const read = await postMcp(app, "tools/call", { name: "read_file", arguments: { path } }, key);
-  expect(read.body.result?.content?.[0]?.text).toContain("do-not-log");
-  const row = db.query("SELECT result_text FROM tool_calls WHERE tool_name = 'read_file' ORDER BY started_at DESC LIMIT 1")
-    .get() as { result_text: string };
-  expect(row.result_text).not.toContain("do-not-log");
-  expect(row.result_text).toContain("[redacted: sensitive file]");
+  const key = createApiKey(db, "native-approval").secret;
+  const listing = await postMcp(app, "tools/list", {}, key);
+  expect(listing.status).toBe(200);
+  for (const name of ["write_file", "edit_file", "shell", "memory_forget", "skill_delete"]) {
+    const tool = listing.body.result?.tools?.find((entry) => entry.name === name);
+    expect(tool?.annotations?.readOnlyHint).toBe(false);
+    expect(tool?.annotations?.destructiveHint).toBe(true);
+  }
+  expect(listing.body.result?.tools?.find((entry) => entry.name === "read_file")?.annotations?.readOnlyHint).toBe(true);
+
+  const shell = await postMcp(app, "tools/call", {
+    name: "shell", arguments: { command: "printf native-confirmation" },
+  }, key);
+  expect(shell.body.result?.isError).toBeUndefined();
+  expect(shell.body.result?.content?.[0]?.text).toContain("native-confirmation");
+
+  const path = join(temp(), ".env");
+  writeFileSync(path, "TOKEN=before");
   const write = await postMcp(app, "tools/call", {
-    name: "write_file", arguments: { path, contents: "PASSWORD=new-do-not-log" },
+    name: "write_file", arguments: { path, contents: "TOKEN=after" },
   }, key);
-  expect(write.body.result?.content?.[0]?.text).toContain("approval_required");
-  expect(readFileSync(path, "utf8")).toBe("PASSWORD=do-not-log");
-  const args = db.query("SELECT arguments_json FROM tool_calls WHERE tool_name = 'write_file' ORDER BY started_at DESC LIMIT 1")
-    .get() as { arguments_json: string };
-  expect(args.arguments_json).not.toContain("new-do-not-log");
+  expect(write.body.result?.isError).toBeUndefined();
+  expect(readFileSync(path, "utf8")).toBe("TOKEN=after");
+
+  expect(memorySave(db, { key: "temporary", body: "note" }).isError).toBeUndefined();
+  const forgotten = await postMcp(app, "tools/call", {
+    name: "memory_forget", arguments: { key: "temporary" },
+  }, key);
+  expect(forgotten.body.result?.isError).toBeUndefined();
+  expect(memorySearch(db, { query: "temporary" }).content[0].text).toBe("");
+
+  const count = db.query("SELECT COUNT(*) AS n FROM approvals").get() as { n: number };
+  expect(count.n).toBe(0);
   db.close();
 });
 
-test("approval storage omits raw shell commands but operator sees an ephemeral preview", async () => {
+test("native tool calls keep sensitive arguments and output out of the audit database", async () => {
   const db = openDatabase(":memory:");
   const app = await testApp(db);
-  const key = createApiKey(db, "redaction").secret;
-  const secret = "placeholder-value-for-regression-only";
-  const command = `printf '%s' '${secret}'`;
-  const pending = await postMcp(app, "tools/call", { name: "shell", arguments: { command } }, key);
-  expect(pending.body.result?.content?.[0]?.text).toContain("approval_required");
-  const persisted = db.query("SELECT summary FROM approvals ORDER BY created_at DESC LIMIT 1").get() as { summary: string };
-  expect(persisted.summary).not.toContain(secret);
-  expect(persisted.summary).toContain("SHA-256");
-  const call = db.query("SELECT arguments_json FROM tool_calls WHERE tool_name = 'shell' ORDER BY started_at DESC LIMIT 1")
-    .get() as { arguments_json: string };
-  expect(call.arguments_json).not.toContain(secret);
-  const login = await app.request("/api/login", {
-    method: "POST", headers: { host: "127.0.0.1", "content-type": "application/json" },
-    body: JSON.stringify(testOperator),
-  });
-  const cookie = login.headers.getSetCookie().map((value) => value.split(";")[0]).join("; ");
-  const view = await app.request("/api/approvals", { headers: { host: "127.0.0.1", cookie } });
-  expect(view.status).toBe(200);
-  const payload = await view.json() as { data: { items: { preview: string }[] } };
-  expect(payload.data.items[0]?.preview).toContain(secret);
-  db.close();
-});
-
-test("file approval preview describes changed keys without persisting values", async () => {
-  const db = openDatabase(":memory:");
-  const app = await testApp(db);
-  const key = createApiKey(db, "config-review").secret;
+  const key = createApiKey(db, "audit").secret;
+  const secret = "sample-token-not-a-credential";
   const path = join(temp(), "private.pem");
-  writeFileSync(path, "TOKEN=old-value\nSTABLE=same");
-  const request = await postMcp(app, "tools/call", {
-    name: "write_file",
-    arguments: { path, contents: "TOKEN=new-sensitive-value\nSTABLE=same\nADDED=secret" },
+  writeFileSync(path, secret);
+  const read = await postMcp(app, "tools/call", {
+    name: "read_file", arguments: { path },
   }, key);
-  expect(request.body.result?.content?.[0]?.text).toContain("approval_required");
-  const { summary } = db.query("SELECT summary FROM approvals ORDER BY created_at DESC LIMIT 1").get() as { summary: string };
-  expect(summary).toContain("Keys changed: TOKEN");
-  expect(summary).toContain("Keys added: ADDED");
-  expect(summary).not.toContain("new-sensitive-value");
-  expect(summary).not.toContain("secret\n");
-  expect(readFileSync(path, "utf8")).toContain("old-value");
-  db.close();
-});
+  expect(read.body.result?.content?.[0]?.text).toContain(secret);
+  const readRow = db.query("SELECT result_text FROM tool_calls WHERE tool_name = 'read_file' LIMIT 1")
+    .get() as { result_text: string };
+  expect(readRow.result_text).not.toContain(secret);
 
-test("approval is one-time, bound to caller and exact arguments", async () => {
-  const db = openDatabase(":memory:");
-  const app = await testApp(db);
-  const firstKey = createApiKey(db, "first").secret;
-  const secondKey = createApiKey(db, "second").secret;
-  const args = { command: "echo rm -rf" };
-  expect(approvalReason("shell", args)).not.toBeNull();
-  expect(approvalReason("shell", { command: "git status" }, "risky")).toBeNull();
-  expect(approvalReason("shell", { command: "git status" })).not.toBeNull();
-  expect(approvalReason("write_file", { path: "/tmp/.env" })).not.toBeNull();
-  expect(approvalReason("shell", { command: "git -C /project push origin main" })).not.toBeNull();
-  expect(approvalReason("shell", { command: "git push --force-with-lease origin develop" })).not.toBeNull();
-  expect(approvalReason("shell", { command: "DROP TABLE users" })).not.toBeNull();
-  expect(approvalReason("shell", { command: "DELETE FROM users;" })).not.toBeNull();
-  expect(approvalReason("shell", { command: "DELETE FROM users WHERE id = 1" }, "risky")).toBeNull();
-  const pending = await postMcp(app, "tools/call", { name: "shell", arguments: args }, firstKey);
-  const text = pending.body.result?.content?.[0]?.text ?? "";
-  expect(text).toContain("approval_required");
-  const id = /request ([a-f0-9-]{36})/.exec(text)?.[1];
-  expect(id).toBeTruthy();
-  const unauthorized = await app.request(`/api/approvals/${id}/decision`, { method: "POST",
-    headers: { host: "127.0.0.1", "content-type": "application/json" }, body: JSON.stringify({ decision: "approved" }) });
-  expect(unauthorized.status).toBe(401);
-  const session = await app.request("/api/login", { method: "POST",
-    headers: { host: "127.0.0.1", "content-type": "application/json" }, body: JSON.stringify(testOperator) });
-  const cookie = session.headers.getSetCookie().map((value) => value.split(";")[0]).join("; ");
-  const decision = await app.request(`/api/approvals/${id}/decision`, { method: "POST",
-    headers: { host: "127.0.0.1", cookie, "content-type": "application/json" },
-    body: JSON.stringify({ decision: "approved" }) });
-  expect(decision.status).toBe(200);
-  const other = await postMcp(app, "tools/call", { name: "shell", arguments: { ...args, approval_id: id } }, secondKey);
-  expect(other.body.result?.content?.[0]?.text).toContain("approval_invalid");
-  const changed = await postMcp(app, "tools/call", { name: "shell",
-    arguments: { command: "echo rm -rf && echo extra", approval_id: id } }, firstKey);
-  expect(changed.body.result?.content?.[0]?.text).toContain("approval_invalid");
-  const accepted = await postMcp(app, "tools/call", { name: "shell", arguments: { ...args, approval_id: id } }, firstKey);
-  expect(accepted.body.result?.isError).toBeUndefined();
-  expect(accepted.body.result?.content?.[0]?.text).toContain("rm -rf");
-  const reused = await postMcp(app, "tools/call", { name: "shell", arguments: { ...args, approval_id: id } }, firstKey);
-  expect(reused.body.result?.content?.[0]?.text).toContain("approval_invalid");
+  const command = `printf '%s' '${secret}'`;
+  const result = await postMcp(app, "tools/call", {
+    name: "shell", arguments: { command },
+  }, key);
+  expect(result.body.result?.content?.[0]?.text).toContain(secret);
+  const shellRow = db.query("SELECT arguments_json, result_text FROM tool_calls WHERE tool_name = 'shell' LIMIT 1")
+    .get() as { arguments_json: string; result_text: string };
+  expect(shellRow.arguments_json).not.toContain(secret);
+  expect(shellRow.result_text).not.toContain(secret);
+  expect(shellRow.arguments_json).toContain("command omitted");
+  const write = await postMcp(app, "tools/call", {
+    name: "write_file", arguments: { path, contents: "TOKEN=new-private-value" },
+  }, key);
+  expect(write.body.result?.isError).toBeUndefined();
+  const writeRow = db.query("SELECT arguments_json FROM tool_calls WHERE tool_name = 'write_file' LIMIT 1")
+    .get() as { arguments_json: string };
+  expect(writeRow.arguments_json).not.toContain("new-private-value");
   db.close();
 });

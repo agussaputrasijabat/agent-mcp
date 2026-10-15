@@ -5,7 +5,6 @@ import { expect, test } from "bun:test";
 import { createApiKey } from "../src/auth/keys.ts";
 import { beginToolCall, getToolCall } from "../src/db/tool-calls.ts";
 import { openDatabase } from "../src/db/database.ts";
-import { updateSettings } from "../src/db/settings.ts";
 import { testApp, testOperator } from "./harness.ts";
 import { postMcp } from "./mcp-client.ts";
 
@@ -15,7 +14,6 @@ test("tool_calls stores a finished read and redacts the live secret", async () =
   await Bun.write(file, "hello");
   const db = openDatabase(":memory:");
   const app = await testApp(db);
-  updateSettings(db, { shell_policy: "risky" });
   const created = createApiKey(db, "laptop");
   const read = await postMcp(app, "tools/call", {
     name: "read_file",

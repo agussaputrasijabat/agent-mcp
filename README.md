@@ -14,7 +14,7 @@ Server ini **bukan** CLI, IDE, atau model AI. ChatGPT atau Claude memilih tool; 
 
 - **Bekerja dengan kode:** membaca, membuat, dan mengedit file dengan penulisan atomik dan pemeriksaan versi opsional; mencari path atau teks; menjalankan perintah shell, Git, build, dan tes.
 - **Menyimpan konteks:** memori lintas percakapan dan skill yang bisa digunakan kembali. Skill dalam repository juga dapat dibaca tanpa disalin ke database.
-- **Memantau aktivitas:** dashboard untuk feed panggilan tool, riwayat sesi, persetujuan eksekusi berisiko, klien, API key, memori, skill, dan pengaturan.
+- **Memantau aktivitas:** dashboard untuk feed panggilan tool, riwayat sesi, klien, API key, memori, skill, dan pengaturan.
 - **Terhubung secara remote:** endpoint MCP Streamable HTTP dengan API key atau OAuth, untuk penggunaan lokal maupun server publik.
 
 ### Cara kerjanya
@@ -27,7 +27,7 @@ flowchart LR
     B --> E[("SQLite: sesi, audit, memori, skill")]
 ```
 
-Tool berjalan dengan **izin akun sistem operasi yang menjalankan server**, bukan di sandbox folder proyek. Baca [model keamanan](docs/security.md) sebelum membuka server ke internet.
+Tool berjalan dengan **izin akun sistem operasi yang menjalankan server**, bukan di sandbox folder proyek. Konfirmasi pemanggilan tool ditangani oleh **ChatGPT atau Claude** sesuai pengaturan izin klien—tidak perlu approval tambahan di dashboard. Karena dialog tidak selalu dijamin muncul, gunakan izin klien dan akun OS yang ketat. Baca [model keamanan](docs/security.md) sebelum membuka server ke internet.
 
 ## Mulai cepat
 
@@ -127,7 +127,6 @@ Agent MCP **tidak menyediakan `web_search`**. Gunakan pencarian web bawaan klien
 | Halaman | Fungsi |
 | --- | --- |
 | Feed | Panggilan tool, hasil, waktu eksekusi, dan filter |
-| Persetujuan | Tinjau, setujui, atau tolak operasi MCP yang memerlukan approval server |
 | Sesi | Riwayat panggilan yang dikelompokkan per sesi |
 | Klien | API key aktif dan klien OAuth yang tercatat |
 | Kunci | Membuat serta mencabut API key |

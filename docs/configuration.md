@@ -17,7 +17,6 @@
 | `BETTER_AUTH_SECRET` | Tidak ada | Secret Better Auth, minimum 32 karakter. |
 | `TRUST_PROXY` | `false` | `true` jika reverse proxy tepercaya meneruskan alamat klien untuk pembatasan login. |
 | `ALLOWED_HOSTS` | Tidak ada | Tambahan hostname yang diterima pada header Host/Origin, dipisahkan koma. |
-| `AGENT_MCP_SHELL_POLICY` | `risky` | Set `strict` untuk memaksa approval setiap perintah shell; pilihan ini tidak bisa dilemahkan melalui dashboard. |
 
 `.env.example` juga mencantumkan `LOG_LEVEL`, tetapi saat ini server tidak menggunakannya untuk mengatur level log. Jangan mengandalkan variabel tersebut untuk menyembunyikan output sensitif.
 
@@ -46,7 +45,6 @@ Menu **Pengaturan** menyimpan nilai berikut ke SQLite:
 | `shell_concurrency_limit` | `32` | 1–128 per proses |
 | `shell_timeout_ms` | `120000` | Minimum 1000 ms dan tidak melebihi batas maksimum |
 | `shell_timeout_max_ms` | `600000` | Minimum 1000 ms |
-| `shell_policy` | `strict` | `risky` memeriksa pola umum; `strict` selalu meminta approval operator |
 | `output_char_limit` | `30000` | Ada di database, belum dapat diubah lewat form |
 
 Perubahan batas shell dipakai pada panggilan berikutnya. Perubahan URL di dashboard **tidak otomatis memperbarui `PUBLIC_BASE_URL` pada proses yang sedang berjalan**: metadata OAuth dan resource URL dibuat dari variabel lingkungan ketika aplikasi dimulai. Untuk mengganti domain, sesuaikan juga konfigurasi proses, restart server, dan sambungkan ulang klien OAuth.

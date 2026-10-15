@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import type { Database } from "bun:sqlite";
 import { currentMcpRequest } from "../mcp/request-context.ts";
-import { sensitivePath } from "../security/approval.ts";
+import { sensitivePath } from "../security/sensitive-path.ts";
 import { truncate } from "../tools/result.ts";
 
 const clientInfoKey = "io.modelcontextprotocol/clientInfo";

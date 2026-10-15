@@ -19,7 +19,7 @@ export const skillReadInput = z.object({
   project_path: projectPath,
   source: z.enum(["database", "repo"]).optional(),
 });
-export const skillDeleteInput = z.object({ name: z.string(), project_path: projectPath, approval_id: z.string().uuid().optional() });
+export const skillDeleteInput = z.object({ name: z.string(), project_path: projectPath });
 export const skillSaveInput = z.object({
   name: z.string(),
   description: z.string(),
