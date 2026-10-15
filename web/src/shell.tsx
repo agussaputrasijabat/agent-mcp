@@ -10,6 +10,7 @@ import {
   Moon,
   PlugsConnected,
   Pulse,
+  ShieldCheck,
   SidebarSimple,
   Sun,
   Wrench,
@@ -34,6 +35,7 @@ const groups: { label: string; items: NavEntry[] }[] = [
     items: [
       { href: "/", label: "Feed", icon: Pulse },
       { href: "/sessions", label: "Sesi", icon: ClockCounterClockwise },
+      { href: "/approvals", label: "Persetujuan", icon: ShieldCheck },
     ],
   },
   {
@@ -58,6 +60,7 @@ const groups: { label: string; items: NavEntry[] }[] = [
 const descriptions: Record<string, string> = {
   "/": "Pantau panggilan tool dari seluruh sesi secara langsung.",
   "/sessions": "Riwayat sesi dan aktivitas yang terhubung ke Agent MCP.",
+  "/approvals": "Tinjau dan setujui eksekusi berisiko satu per satu.",
   "/keys": "Kelola kredensial untuk menghubungkan klien ke server.",
   "/clients": "Daftar koneksi API key dan OAuth yang pernah digunakan.",
   "/memories": "Catatan persisten yang bisa digunakan kembali oleh agent.",

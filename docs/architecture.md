@@ -46,11 +46,13 @@ Server tidak menjalankan model bahasa. Pilihan tool, konfirmasi user di chat, se
 
 SQLite menyimpan identitas dan sesi operator, kredensial API key dalam bentuk yang diperlukan untuk verifikasi, data OAuth, panggilan tool, memori, skill, dan pengaturan. Skill bawaan di-seed saat database dibuka. Skill repository dibaca langsung dari direktori konvensional dan diperlakukan sebagai **read-only**.
 
-Memori dapat diberi `project_path`. Pencarian dengan path proyek menampilkan memori global serta memori untuk path yang sama; pencarian tanpa path hanya melihat memori global. Key memori tetap unik di database, jadi menyimpan key yang sama akan mengganti catatan lama meskipun `project_path` berbeda.
+Memori dapat diberi `project_path`. Pencarian dengan path proyek menampilkan memori global serta memori untuk path yang sama; pencarian tanpa path hanya melihat memori global. Data lama dipertahankan pada tabel `memories`, sedangkan catatan baru pada scope yang berbeda memakai tabel `project_memories` dengan constraint unik `(project_path, key)`. Key sama pada dua proyek tidak lagi saling menimpa.
 
 ## Batas proses
 
-Shell dijalankan dengan `bash -lc` via `Bun.spawn`. Batas konkurensi dan waktu eksekusi dibaca dari pengaturan SQLite. Panggilan shell tidak diantrikan setelah batas konkurensi tercapai; tool mengembalikan error `shell_busy`.
+Shell dijalankan dengan `bash -lc` via `Bun.spawn`. Batas konkurensi dan waktu eksekusi dibaca dari pengaturan SQLite. Output proses dibaca secara bertahap dengan batas buffer; saat timeout, server berusaha menghentikan process group di sistem POSIX. Panggilan shell tidak diantrikan setelah batas konkurensi tercapai; tool mengembalikan `shell_busy`.
+
+Gerbang approval pada `src/security/approval.ts` mengikat keputusan operator ke identitas autentikasi dan hash permintaan, lalu menyimpan statusnya di SQLite. Mode `strict` menahan seluruh pemanggilan shell sampai operator menyetujui. Mode `risky` hanya mendeteksi pola umum, bukan sandbox. Operasi file memakai lock direktori sementara per path lintas-proses, lalu temp file dan atomic rename; pemeriksaan `expected_hash` opsional menolak versi lama. Hashing dibatasi 8 MiB. Lock ini hanya berlaku bagi proses yang mengikuti protokol Agent MCP; aplikasi eksternal tetap bisa mengubah file tanpa lock.
 
 Akses file tidak dibatasi otomatis ke `project_path`. Untuk membatasi dampak kompromi, jalankan server memakai akun OS dengan hak akses sesedikit mungkin. Lihat [keamanan](security.md).
 

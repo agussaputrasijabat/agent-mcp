@@ -5,6 +5,7 @@ import { expect, test } from "bun:test";
 import { createApiKey } from "../src/auth/keys.ts";
 import { beginToolCall, getToolCall } from "../src/db/tool-calls.ts";
 import { openDatabase } from "../src/db/database.ts";
+import { updateSettings } from "../src/db/settings.ts";
 import { testApp, testOperator } from "./harness.ts";
 import { postMcp } from "./mcp-client.ts";
 
@@ -14,6 +15,7 @@ test("tool_calls stores a finished read and redacts the live secret", async () =
   await Bun.write(file, "hello");
   const db = openDatabase(":memory:");
   const app = await testApp(db);
+  updateSettings(db, { shell_policy: "risky" });
   const created = createApiKey(db, "laptop");
   const read = await postMcp(app, "tools/call", {
     name: "read_file",
@@ -52,7 +54,7 @@ test("tool_calls stores a finished read and redacts the live secret", async () =
     session_key: string;
   };
   expect(stored.arguments_json.includes(created.secret)).toBe(false);
-  expect(stored.arguments_json.includes("[redacted]")).toBe(true);
+  expect(stored.arguments_json.includes("(command omitted)")).toBe(true);
   expect(stored.session_key).toBe("chat-a");
 
   await app.request("/mcp", {
@@ -71,10 +73,11 @@ test("tool_calls stores a finished read and redacts the live secret", async () =
       params: { name: "shell", arguments: { command: "printf '%s' 'https://example.test/?api_key=other-value&token=zzz'" } },
     }),
   });
-  const latest = db.query("SELECT arguments_json FROM tool_calls WHERE arguments_json LIKE '%example.test%'").get() as { arguments_json: string };
+  const latest = db.query("SELECT arguments_json FROM tool_calls WHERE tool_name = 'shell' ORDER BY started_at DESC LIMIT 1").get() as { arguments_json: string };
+  expect(latest.arguments_json.includes("example.test")).toBe(false);
   expect(latest.arguments_json.includes("other-value")).toBe(false);
   expect(latest.arguments_json.includes("zzz")).toBe(false);
-  expect(latest.arguments_json.includes("[redacted]")).toBe(true);
+  expect(latest.arguments_json.includes("(command omitted)")).toBe(true);
 
   const cookie = await signIn(app);
   const anon = await app.request("/api/sessions", { headers: { host: "127.0.0.1" } });

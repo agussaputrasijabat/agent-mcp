@@ -5,6 +5,7 @@ import type { Context, Hono } from "hono";
 import { KeyValidationError, createApiKey, revokeApiKey } from "../auth/keys.ts";
 import { SettingsError, readSettings, updateSettings } from "../db/settings.ts";
 import { likeContains } from "../tools/names.ts";
+import { decideApproval, listApprovals } from "../security/approval.ts";
 import { memoryForget, memorySave } from "../tools/memory.ts";
 import { skillDelete, skillRead, skillSave } from "../tools/skills.ts";
 import { fail, ok } from "./json.ts";
@@ -107,13 +108,13 @@ export function registerDashboard(app: Hono, db: Database, operator: OperatorChe
   app.get("/api/memories", async (c) => {
     if (!(await operator(c))) return fail(c, 401, "unauthorized", "Sign in required");
     const q = c.req.query("q");
-    const items = q
-      ? db.query(
-          `SELECT key, body, project_path, updated_at FROM memories
-           WHERE key LIKE ? ESCAPE '\\' OR body LIKE ? ESCAPE '\\'
-           ORDER BY updated_at DESC`,
-        ).all(likeContains(q), likeContains(q))
-      : db.query("SELECT key, body, project_path, updated_at FROM memories ORDER BY updated_at DESC").all();
+    const statement = `SELECT key, body, project_path, updated_at FROM (
+      SELECT key, body, project_path, updated_at FROM memories
+      UNION ALL
+      SELECT key, body, NULLIF(project_path, '') AS project_path, updated_at FROM project_memories
+    ) ${q ? "WHERE key LIKE ? ESCAPE '\\' OR body LIKE ? ESCAPE '\\'" : ""}
+    ORDER BY updated_at DESC`;
+    const items = q ? db.query(statement).all(likeContains(q), likeContains(q)) : db.query(statement).all();
     return ok(c, { items });
   });
 
@@ -127,13 +128,13 @@ export function registerDashboard(app: Hono, db: Database, operator: OperatorChe
     const result = memorySave(db, { key: body.key, body: body.body, project_path: project });
     const error = toolError(result);
     if (error) return fail(c, error.code === "not_found" ? 404 : 400, error.code, error.message);
-    const row = db.query("SELECT key, body, project_path, updated_at FROM memories WHERE key = ?").get(body.key);
-    return ok(c, row);
+    return ok(c, { key: body.key, body: body.body, project_path: project ?? null, updated_at: new Date().toISOString() });
   });
 
   app.delete("/api/memories/:key", async (c) => {
     if (!(await operator(c))) return fail(c, 401, "unauthorized", "Sign in required");
-    const result = memoryForget(db, { key: c.req.param("key") });
+    const project = c.req.query("project_path");
+    const result = memoryForget(db, { key: c.req.param("key"), project_path: project || undefined });
     const error = toolError(result);
     if (error) return fail(c, error.code === "not_found" ? 404 : 400, error.code, error.message);
     return ok(c, { ok: true });
@@ -175,12 +176,37 @@ export function registerDashboard(app: Hono, db: Database, operator: OperatorChe
     return ok(c, { ok: true });
   });
 
+  app.get("/api/approvals", async (c) => {
+    if (!(await operator(c))) return fail(c, 401, "unauthorized", "Sign in required");
+    return ok(c, { items: listApprovals(db) });
+  });
+
+  app.post("/api/approvals/:id/decision", async (c) => {
+    if (!(await operator(c))) return fail(c, 401, "unauthorized", "Sign in required");
+    const origin = c.req.header("origin");
+    if (origin) {
+      let parsedOrigin: URL;
+      try { parsedOrigin = new URL(origin); }
+      catch { return fail(c, 403, "invalid_origin", "Invalid Origin header"); }
+      const allowed = new Set([new URL(c.req.url).origin, new URL(readSettings(db).public_base_url).origin]);
+      if (!allowed.has(parsedOrigin.origin)) return fail(c, 403, "invalid_origin", "Origin does not match server");
+    }
+    const body = await c.req.json().catch(() => null) as { decision?: unknown } | null;
+    if (body?.decision !== "approved" && body?.decision !== "denied") {
+      return fail(c, 400, "validation_error", "decision must be approved or denied");
+    }
+    if (!decideApproval(db, c.req.param("id"), body.decision)) {
+      return fail(c, 409, "approval_unavailable", "Request was decided or has expired");
+    }
+    return ok(c, { ok: true });
+  });
+
   const page = async (c: Context) => {
     if (!(await operator(c))) return c.redirect("/login");
     return dashboardPage();
   };
 
-  for (const path of ["/keys", "/clients", "/settings", "/memories", "/skills", "/skills/new", "/docs", "/setup"]) {
+  for (const path of ["/keys", "/clients", "/settings", "/memories", "/skills", "/skills/new", "/approvals", "/docs", "/setup"]) {
     app.get(path, page);
   }
   app.get("/tutorial", (c) => c.redirect("/docs"));

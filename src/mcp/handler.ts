@@ -1,4 +1,5 @@
 import { createMcpHandler, McpServer } from "@modelcontextprotocol/server";
+import { requireApproval, sensitivePath } from "../security/approval.ts";
 import type { Database } from "bun:sqlite";
 import { beginToolCall, finishToolCall, type ToolMeta } from "../db/tool-calls.ts";
 import { readSettings, type Settings } from "../db/settings.ts";
@@ -60,17 +61,26 @@ const deleteAnnotations = {
 function traced<T>(db: Database, name: string, args: T, ctx: ToolMeta, run: () => ToolResult | Promise<ToolResult>) {
   const id = beginToolCall(db, { toolName: name, args, ctx });
   const started = Date.now();
+  const candidate = args as Record<string, unknown>;
+  const omitResult = name === "shell" ||
+    (name === "read_file" && typeof candidate.path === "string" && sensitivePath(candidate.path));
   return Promise.resolve()
     .then(run)
     .then((result) => {
-      finishToolCall(db, id, result, Date.now() - started);
+      finishToolCall(db, id, result, Date.now() - started, new Date(), omitResult);
       return result;
     })
     .catch((error: unknown) => {
       const message = error instanceof Error ? error.message : "tool failed";
-      finishToolCall(db, id, { content: [{ text: message }], isError: true }, Date.now() - started);
+      finishToolCall(db, id, { content: [{ text: message }], isError: true }, Date.now() - started, new Date(), omitResult);
       throw error;
     });
+}
+
+function guarded<T extends Record<string, unknown>>(
+  db: Database, name: string, args: T, ctx: ToolMeta, run: () => ToolResult | Promise<ToolResult>,
+) {
+  return traced(db, name, args, ctx, () => requireApproval(db, name, args) ?? run());
 }
 
 export function createHostHandler(options: {
@@ -93,7 +103,7 @@ export function createHostHandler(options: {
     server.registerTool(
       "read_file",
       {
-        description: "Read a UTF-8 file at an absolute path. A png, jpeg, jpg, gif, or webp file is returned as an image the chat can show.",
+        description: "Read a UTF-8 file at an absolute path. Set include_hash=true before editing to obtain the SHA-256 expected_hash. Supported images are returned as images.",
         inputSchema: readFileInput,
         annotations: readOnly,
       },
@@ -102,16 +112,16 @@ export function createHostHandler(options: {
     server.registerTool(
       "write_file",
       {
-        description: "Create or replace a UTF-8 file at an absolute path.",
+        description: "Create or atomically replace a UTF-8 file. Use expected_hash from read_file to reject concurrent changes, or 'absent' for new files. Sensitive paths require operator approval.",
         inputSchema: writeFileInput,
         annotations: writeAnnotations,
       },
-      async (input, ctx) => traced(db, "write_file", input, ctx, () => writeFile(input)),
+      async (input, ctx) => guarded(db, "write_file", input, ctx, () => writeFile(input)),
     );
     server.registerTool(
       "edit_file",
-      { description: "Replace one exact string in a UTF-8 file.", inputSchema: editFileInput, annotations: writeAnnotations },
-      async (input, ctx) => traced(db, "edit_file", input, ctx, () => editFile(input)),
+      { description: "Atomically replace one exact string in a UTF-8 file. Read with include_hash=true and pass expected_hash to prevent stale edits.", inputSchema: editFileInput, annotations: writeAnnotations },
+      async (input, ctx) => guarded(db, "edit_file", input, ctx, () => editFile(input)),
     );
     server.registerTool(
       "glob",
@@ -126,12 +136,12 @@ export function createHostHandler(options: {
     server.registerTool(
       "shell",
       {
-        description: "Run a bash command on the MCP host.",
+        description: "Run a bash command on the host. Risky operations can return approval_required; the operator approves at /approvals, then retry with the same arguments and approval_id.",
         inputSchema: shellInput,
         annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
       },
       async (input, ctx) =>
-        traced(db, "shell", input, ctx, () =>
+        guarded(db, "shell", input, ctx, () =>
           runShell(input, gate, {
             timeoutMs: limits().shell_timeout_ms ?? SHELL_TIMEOUT_MS,
             timeoutMaxMs: limits().shell_timeout_max_ms ?? SHELL_TIMEOUT_MAX_MS,
@@ -160,7 +170,7 @@ export function createHostHandler(options: {
     server.registerTool(
       "memory_forget",
       { description: "Delete one note by key.", inputSchema: memoryForgetInput, annotations: deleteAnnotations },
-      async (input, ctx) => traced(db, "memory_forget", input, ctx, () => memoryForget(db, input)),
+      async (input, ctx) => guarded(db, "memory_forget", input, ctx, () => memoryForget(db, input)),
     );
     server.registerTool(
       "skill_list",
@@ -196,7 +206,7 @@ export function createHostHandler(options: {
         inputSchema: skillDeleteInput,
         annotations: deleteAnnotations,
       },
-      async (input, ctx) => traced(db, "skill_delete", input, ctx, () => skillDelete(db, input)),
+      async (input, ctx) => guarded(db, "skill_delete", input, ctx, () => skillDelete(db, input)),
     );
     return server;
   });

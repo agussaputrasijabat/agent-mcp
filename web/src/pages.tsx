@@ -217,6 +217,7 @@ type Settings = {
   shell_concurrency_limit: number;
   shell_timeout_ms: number;
   shell_timeout_max_ms: number;
+  shell_policy: "risky" | "strict";
 };
 
 type AutostartState = { enabled: boolean; supported: boolean; provider: string; path: string };
@@ -284,6 +285,7 @@ export function SettingsPage() {
         shell_concurrency_limit: Number(form.shell_concurrency_limit),
         shell_timeout_ms: Number(form.shell_timeout_ms),
         shell_timeout_max_ms: Number(form.shell_timeout_max_ms),
+        shell_policy: form.shell_policy,
       }),
     });
     if (!result.ok) {
@@ -326,6 +328,16 @@ export function SettingsPage() {
               <Field>
                 <FieldLabel htmlFor="shell-timeout-max">Timeout maksimum</FieldLabel>
                 <Input id="shell-timeout-max" min={1} type="number" value={form.shell_timeout_max_ms} onChange={(event) => setForm({ ...form, shell_timeout_max_ms: Number(event.target.value) })} />
+              </Field>
+              <Field className="md:col-span-3">
+                <FieldLabel htmlFor="shell-policy">Kebijakan approval shell</FieldLabel>
+                <select id="shell-policy" value={form.shell_policy}
+                  onChange={(event) => setForm({ ...form, shell_policy: event.target.value as Settings["shell_policy"] })}
+                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-2 focus-visible:outline-ring">
+                  <option value="risky">Standar — minta approval untuk pola berisiko</option>
+                  <option value="strict">Ketat — semua perintah shell perlu approval</option>
+                </select>
+                <p className="text-xs leading-5 text-muted-foreground">Mode Standar tidak bisa mendeteksi semua cara eksekusi shell. Gunakan mode Ketat jika klien atau kode yang dibaca tidak sepenuhnya dipercaya.</p>
               </Field>
               <div className="flex flex-col items-start gap-3 md:col-span-3">
                 <Button type="submit">Simpan perubahan</Button>
@@ -411,9 +423,10 @@ export function MemoriesPage() {
     load();
   }
 
-  async function remove(memoryKey: string) {
+  async function remove(row: MemoryRow) {
     if (!window.confirm("Hapus memori ini secara permanen?")) return;
-    const result = await api<{ ok: boolean }>(`/api/memories/${encodeURIComponent(memoryKey)}`, { method: "DELETE" });
+    const scope = row.project_path ? `?project_path=${encodeURIComponent(row.project_path)}` : "";
+    const result = await api<{ ok: boolean }>(`/api/memories/${encodeURIComponent(row.key)}${scope}`, { method: "DELETE" });
     if (!result.ok) {
       setMessage(result.message);
       return;
@@ -469,12 +482,12 @@ export function MemoriesPage() {
               </TableHeader>
               <TableBody>
                 {rows.map((row) => (
-                  <TableRow key={row.key}>
+                  <TableRow key={`${row.project_path ?? ""}:${row.key}`}>
                     <TableCell>{row.key}</TableCell>
                     <TableCell className="max-w-40 truncate text-muted-foreground">{row.project_path ?? ""}</TableCell>
                     <TableCell className="max-w-64 truncate text-muted-foreground">{row.body.slice(0, 120)}</TableCell>
                     <TableCell>
-                      <Button type="button" variant="destructive" size="sm" onClick={() => void remove(row.key)}>Hapus</Button>
+                      <Button type="button" variant="destructive" size="sm" onClick={() => void remove(row)}>Hapus</Button>
                     </TableCell>
                   </TableRow>
                 ))}

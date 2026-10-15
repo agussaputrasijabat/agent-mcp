@@ -11,6 +11,7 @@
     "build:binary": "bun run build && bun scripts/build-binary.ts",
     "package:npm": "bun run build:binary && bun scripts/package-npm.ts",
     "typecheck": "tsc --noEmit",
+    "lint": "eslint \"web/src/**/*.{ts,tsx}\"",
     "start": "bun run build && bun src/index.ts",
     "start:prod": "bun --no-env-file run build && bun --no-env-file --env-file=.env.production src/index.ts",
     "test": "bun test",
@@ -35,11 +36,15 @@
     "zod": "4.6.7"
   },
   "devDependencies": {
+    "@babel/core": "^8.0.7",
+    "@babel/eslint-parser": "^8.0.7",
     "@tailwindcss/vite": "4.3.3",
     "@types/bun": "1.4.3",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.1.2",
+    "eslint": "^10.12.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
     "geist": "1.7.2",
     "tailwindcss": "4.3.3",
     "typescript": "7.0.2",

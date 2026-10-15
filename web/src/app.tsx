@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { FeedPage } from "./feed.tsx";
+import { ApprovalsPage } from "./approvals.tsx";
 import { DocsPage, SetupPage } from "./guide.tsx";
 import { LoginPage } from "./login.tsx";
 import { ClientsPage, KeysPage, MemoriesPage, SettingsPage, SkillEditor, SkillsPage } from "./pages.tsx";
@@ -19,6 +20,7 @@ export function App() {
   }
   if (path === "/keys") return <Shell><KeysPage /></Shell>;
   if (path === "/clients") return <Shell><ClientsPage /></Shell>;
+  if (path === "/approvals") return <Shell><ApprovalsPage /></Shell>;
   if (path === "/settings") return <Shell><SettingsPage /></Shell>;
   if (path === "/memories") return <Shell><MemoriesPage /></Shell>;
   if (path === "/skills") return <Shell><SkillsPage /></Shell>;

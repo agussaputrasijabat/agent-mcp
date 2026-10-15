@@ -13,11 +13,13 @@
 
 Ini **bukan** isolasi sistem operasi. `read_file`, `write_file`, `edit_file`, dan `shell` dijalankan dengan izin user yang menjalankan proses Bun. `project_path` hanya memberi konteks kepada klien dan tidak membatasi jangkauan tool.
 
-## Approval tidak ditegakkan server
+## Approval yang ditegakkan server
 
-Template instruksi proyek meminta klien chat meminta izin sebelum operasi berbahaya, seperti penghapusan data atau perintah Git tertentu. **Server tidak memeriksa bukti persetujuan itu.** Setelah panggilan MCP lolos autentikasi, tool akan menjalankan aksi sesuai implementasinya.
+Server kini memiliki gerbang approval untuk perintah shell yang terdeteksi berisiko, perubahan file sensitif, serta penghapusan memori atau skill lewat MCP. Panggilan pertama menghasilkan `approval_required` tanpa melakukan eksekusi. Operator harus menyetujui tindakan dari halaman `/approvals`, kemudian klien mengulang argumen identik dengan `approval_id`. Persetujuan terikat pada identitas klien dan hash argumen, dapat digunakan sekali, dan kedaluwarsa setelah lima menit. Persetujuan di chat saja **bukan** bukti approval server.
 
-Jangan menganggap prompt sebagai pengganti pembatasan akses OS, firewall, atau perlindungan kredensial.
+Mode shell default `strict` meminta persetujuan operator pada **setiap** perintah shell. Mode `risky` hanya tersedia sebagai opt-in di Pengaturan dan menggunakan deteksi pola yang **tidak dapat mencegah semua bentuk perintah berbahaya** (script, encoding, alias, interpreter, atau shell tidak langsung). Set `AGENT_MCP_SHELL_POLICY=strict` untuk memaksakan mode ketat. Kebijakan ini tidak membatasi hak OS maupun menjadikan server sandbox. Penulisan file biasa tetap diizinkan dalam konteks hak OS server; `expected_hash` adalah mekanisme konflik opsional.
+
+Jangan menganggap approval atau prompt sebagai pengganti pembatasan akses OS, firewall, atau perlindungan kredensial.
 
 ## Rekomendasi deployment
 
@@ -32,7 +34,7 @@ Jangan menganggap prompt sebagai pengganti pembatasan akses OS, firewall, atau p
 
 ## Audit dan rahasia
 
-Feed dan SQLite menyimpan nama tool, waktu, argumen, hasil, serta status error. Peredaksian berupaya menyembunyikan API key request dan nama parameter tertentu. Namun, perintah shell dan output tool masih bisa memuat rahasia lain (misalnya isi berkas konfigurasi). Anggap database audit sebagai data sensitif.
+Feed dan SQLite menyimpan nama tool, waktu, argumen, hasil, serta status error. Audit meredaksi kredensial koneksi yang diketahui, isi perubahan file sensitif, dan hasil `read_file` pada path sensitif. Isi perintah shell serta output-nya tidak disimpan mentah di tabel audit maupun approval. Pratinjau perintah hanya tersedia sementara di memori server untuk operator terautentikasi. Respons ke klien tetap berisi hasil tool yang sebenarnya. Shell arbitrer masih dapat mengeluarkan rahasia dengan bentuk yang tidak dikenali penyaring; jangan menganggap audit telah bebas dari seluruh informasi sensitif. Lindungi database SQLite dan backup-nya.
 
 ## Jaringan dan `web_fetch`
 

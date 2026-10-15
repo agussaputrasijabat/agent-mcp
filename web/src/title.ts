@@ -10,6 +10,7 @@ export function titleForPath(path: string): string {
   if (path === "/login") return "Masuk";
   if (path === "/") return "Feed";
   if (path === "/sessions" || path.startsWith("/sessions/")) return "Sesi";
+  if (path === "/approvals") return "Persetujuan";
   if (path === "/keys") return "Kunci";
   if (path === "/clients") return "Klien";
   if (path === "/memories") return "Memori";
