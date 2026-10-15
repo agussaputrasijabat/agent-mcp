@@ -29,7 +29,7 @@ const platform = target.includes("windows") ? "win32" : target.includes("darwin"
 const arch = target.includes("arm64") ? "arm64" : target.includes("x64") ? "x64" : process.arch;
 const output = join(root, "dist/bin", `${platform}-${arch}`, platform === "win32" ? "agent-mcp.exe" : "agent-mcp");
 mkdirSync(dirname(output), { recursive: true });
-const command = ["bun", "build", "--compile", "--minify", ...(target ? [`--target=${target}`] : []), entry, "--outfile", output];
+const command = ["bun", "build", "--compile", "--no-compile-autoload-dotenv", "--no-compile-autoload-bunfig", "--minify", ...(target ? [`--target=${target}`] : []), entry, "--outfile", output];
 const processHandle = Bun.spawn(command, { cwd: root, stdout: "inherit", stderr: "inherit" });
 if (await processHandle.exited !== 0) process.exit(1);
 console.log(`Created ${output}`);

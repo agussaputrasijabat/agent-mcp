@@ -2,6 +2,38 @@
 
 Pilih cara menjalankan berdasarkan lokasi host. Semua pilihan memakai proses Bun yang sama dan endpoint MCP `/mcp`.
 
+## CLI standalone tanpa `.env`
+
+Distribusi npm publik belum dirilis; untuk menguji paket global khusus OS host dari repository:
+
+```bash
+bun install
+bun run package:npm
+npm pack ./dist/npm/package --pack-destination ./dist/npm
+npm install -g ./dist/npm/agent-mcp-1.0.0.tgz
+agent-mcp
+```
+
+Pengguna paket global hanya memerlukan Node.js untuk launcher npm; runtime Bun sudah disertakan di executable. Pada saat **pertama dijalankan** (bukan saat `npm install`), masukkan email serta password operator minimal 12 karakter dan ulangi password. CLI membuat `BETTER_AUTH_SECRET` secara kriptografis, menyimpan hash password di SQLite, dan menulis konfigurasi privat ke direktori data aplikasi. Tidak ada kredensial default atau file `.env` yang harus dibuat.
+
+Preferensi port CLI baru adalah **47831**. Bila port tersebut sedang dipakai, CLI otomatis memilih port kosong lain sekali pada setup pertama, kemudian menyimpannya agar tetap stabil pada restart. Nomor lama di konfigurasi existing tidak diubah. Jika port bentrok belakangan, hentikan proses yang terkait atau gunakan `agent-mcp config set port auto`. Jangan ubah port ketika server masih berjalan.
+
+```bash
+agent-mcp start
+agent-mcp status
+agent-mcp open
+agent-mcp config show
+agent-mcp config get port
+agent-mcp config set port 47832
+agent-mcp auth reset-password
+agent-mcp logs
+agent-mcp stop
+```
+
+`config show` menyembunyikan auth secret. `auth reset-password` meminta password baru secara interaktif dan konfirmasi. Akun tetap dapat login selama menggunakan database dan secret yang sama. Jangan bagikan file `config.json` atau database operator.
+
+Lokasi penyimpanan: `~/Library/Application Support/agent-mcp/` pada macOS, `%APPDATA%\\agent-mcp\\` pada Windows, atau `~/.local/share/agent-mcp/` pada Linux. Variabel `AGENT_MCP_HOME` dapat mengubahnya secara eksplisit. CLI lokal hanya mendengarkan pada `127.0.0.1`; koneksi ChatGPT/Claude dari cloud membutuhkan tunnel HTTPS terpisah. Paket uji lokal hanya berisi binary untuk platform saat build, belum rilis npm multi-platform.
+
 ## Persiapan
 
 Pastikan [Bun](https://bun.sh/) dan `bash` tersedia. Untuk membuat pratinjau gambar besar melalui `read_file`, instal **FFmpeg** pada Linux (misalnya `sudo apt install ffmpeg`). Di macOS, `sips` bawaan sistem juga bisa digunakan sebagai alternatif.

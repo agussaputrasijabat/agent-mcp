@@ -2,7 +2,10 @@ import { spawn } from "node:child_process";
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createInterface } from "node:readline/promises";
-import { readConfig, newSecret, type CliConfig } from "./config.ts";
+import { configPath, readConfig, saveConfig, newSecret, type CliConfig } from "./config.ts";
+import { isPortAvailable, selectFirstRunPort, DEFAULT_CLI_PORT } from "./ports.ts";
+import { openDatabase } from "../db/database.ts";
+import { replaceOperatorPassword } from "../auth/operator.ts";
 import { dataDirectory } from "./paths.ts";
 import { completeSetup, operatorReady } from "./setup.ts";
 import { clearInstance, controlHandler, readInstance, requestControl, writeInstance } from "./control.ts";
@@ -19,9 +22,9 @@ async function healthy(config: CliConfig): Promise<boolean> {
   } catch { return false; }
 }
 
-async function passwordPrompt(): Promise<string> {
+async function passwordPrompt(label = "Password operator (minimal 12 karakter)"): Promise<string> {
   if (!process.stdin.isTTY) throw new Error("setup_requires_terminal");
-  process.stdout.write("Password operator (minimal 12 karakter): ");
+  process.stdout.write(`${label}: `);
   process.stdin.setRawMode(true);
   let result = "";
   let onData: (chunk: Buffer) => void;
@@ -67,8 +70,10 @@ async function setup(): Promise<CliConfig> {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("invalid_email");
   const password = await passwordPrompt();
   if (password.length < 12) throw new Error("password_too_short");
-  const config = current ?? { email, secret: newSecret(), port: 3000 };
+  if (await passwordPrompt("Konfirmasi password") !== password) throw new Error("password_confirmation_mismatch");
+  const config = current ?? { email, secret: newSecret(), port: await selectFirstRunPort() };
   await completeSetup(config, password);
+  console.log(`Setup selesai. Dashboard: ${endpoint(config)}`);
   return config;
 }
 
@@ -82,6 +87,8 @@ async function runServer(): Promise<void> {
   process.env.DASHBOARD_EMAIL = config.email;
   delete process.env.DASHBOARD_PASSWORD;
   process.env.PUBLIC_BASE_URL = config.tunnel?.enabled && config.tunnel.url ? config.tunnel.url : endpoint(config);
+  process.env.TRUST_PROXY = "false";
+  delete process.env.ALLOWED_HOSTS;
   const { server, applicationFetch } = await import("../index.ts");
   const instance = { pid: process.pid, token: newSecret() };
   const shutdown = () => {
@@ -105,7 +112,7 @@ async function start(): Promise<void> {
     return;
   }
   // Do not bind over another service.
-  if (await portInUse(config.port)) throw new Error("port_occupied");
+  if (!(await isPortAvailable(config.port))) throw new Error(`port_occupied: ${config.port}; jalankan agent-mcp config set port auto`);
   mkdirSync(dataDirectory(), { recursive: true, mode: 0o700 });
   const fd = openSync(logPath(), "a", 0o600);
   let child;
@@ -131,11 +138,6 @@ async function start(): Promise<void> {
   throw new Error(`server_failed_to_start; lihat ${logPath()}`);
 }
 
-async function portInUse(port: number): Promise<boolean> {
-  const socket = Bun.connect({ hostname: "127.0.0.1", port, socket: { data() {}, open(socket) { socket.end(); }, error() {} } });
-  return socket.then(() => true).catch(() => false);
-}
-
 async function stop(): Promise<void> {
   const config = readConfig();
   const instance = readInstance();
@@ -149,14 +151,65 @@ async function stop(): Promise<void> {
   console.log("Agent MCP dihentikan.");
 }
 
+async function configCommand(): Promise<void> {
+  const config = readConfig();
+  if (!config) throw new Error("run_setup_first");
+  const action = process.argv[3] ?? "show";
+  if (action === "show") {
+    console.log(JSON.stringify({ email: config.email, port: config.port, dataDirectory: dataDirectory(), authSecret: "[redacted]" }, null, 2));
+    return;
+  }
+  if (action === "path") { console.log(configPath()); return; }
+  if (action === "get" && process.argv[4] === "port") { console.log(config.port); return; }
+  if (action === "set" && process.argv[4] === "port") {
+    const value = process.argv[5];
+    if (!value || (value !== "auto" && !/^[0-9]+$/.test(value))) throw new Error("port_must_be_1024_to_65535_or_auto");
+    const port = value === "auto" ? await selectFirstRunPort() : Number(value);
+    if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error("port_must_be_1024_to_65535_or_auto");
+    const instance = readInstance();
+    if (instance && await requestControl(config, instance, "GET")) throw new Error("stop_server_before_changing_port");
+    if (!(await isPortAvailable(port))) throw new Error(`port_occupied: ${port}`);
+    const updated = { ...config, port };
+    saveConfig(updated);
+    const databasePath = join(dataDirectory(), "agent.sqlite");
+    if (existsSync(databasePath)) {
+      const db = openDatabase(databasePath);
+      try {
+        const current = db.query("SELECT public_base_url FROM settings WHERE id = 1").get() as { public_base_url: string } | null;
+        if (current?.public_base_url === endpoint(config)) {
+          db.query("UPDATE settings SET public_base_url = ?, updated_at = ? WHERE id = 1")
+            .run(endpoint(updated), new Date().toISOString());
+        }
+      } finally { db.close(); }
+    }
+    console.log(`Port Agent MCP: ${port}`);
+    return;
+  }
+  throw new Error("usage: agent-mcp config [show|path|get port|set port <1024-65535|auto>]");
+}
+
+async function resetPassword(): Promise<void> {
+  const config = readConfig();
+  if (!config || !operatorReady(config)) throw new Error("run_setup_first");
+  const password = await passwordPrompt("Password baru (minimal 12 karakter)");
+  if (password.length < 12) throw new Error("password_too_short");
+  if (await passwordPrompt("Konfirmasi password baru") !== password) throw new Error("password_confirmation_mismatch");
+  const db = openDatabase(join(dataDirectory(), "agent.sqlite"));
+  try { await replaceOperatorPassword(db, password); }
+  finally { db.close(); }
+  console.log("Password operator berhasil diperbarui.");
+}
+
 async function main(): Promise<void> {
   if (command === "__serve") return runServer();
   if (command === "--help" || command === "help") {
-    console.log("agent-mcp [start|stop|restart|status|logs|open|setup|--foreground|--version]");
+    console.log(`agent-mcp [start|stop|restart|status|logs|open|setup|config|auth reset-password|--foreground|--version]\nPort instalasi baru: ${DEFAULT_CLI_PORT} (fallback otomatis jika terpakai)`);
     return;
   }
   if (command === "--version" || command === "version") { console.log("agent-mcp 1.0.0"); return; }
   if (command === "setup") { await setup(); return; }
+  if (command === "config") return configCommand();
+  if (command === "auth" && process.argv[3] === "reset-password") return resetPassword();
   if (command === "start") return start();
   if (command === "stop") return stop();
   if (command === "restart") { await stop(); return start(); }

@@ -1,5 +1,6 @@
 {
   "name": "agent-mcp",
+  "version": "1.0.0",
   "module": "src/index.ts",
   "type": "module",
   "private": true,
@@ -8,6 +9,7 @@
     "dev": "bun run build && bun --watch src/index.ts",
     "build": "vite build",
     "build:binary": "bun run build && bun scripts/build-binary.ts",
+    "package:npm": "bun run build:binary && bun scripts/package-npm.ts",
     "typecheck": "tsc --noEmit",
     "start": "bun run build && bun src/index.ts",
     "start:prod": "bun --no-env-file run build && bun --no-env-file --env-file=.env.production src/index.ts",

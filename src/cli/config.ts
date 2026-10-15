@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { dataDirectory } from "./paths.ts";
 
@@ -11,15 +11,25 @@ export function readConfig(): CliConfig | undefined {
   const raw: unknown = JSON.parse(readFileSync(configPath(), "utf8"));
   if (!raw || typeof raw !== "object") throw new Error("invalid_config");
   const config = raw as Partial<CliConfig>;
-  if (!config.email || !config.secret || !Number.isInteger(config.port) || (config.port ?? 0) < 1 || (config.port ?? 0) > 65535) {
+  if (!config.email || !/^[a-f0-9]{64}$/.test(config.secret ?? "") || !Number.isInteger(config.port) || (config.port ?? 0) < 1 || (config.port ?? 0) > 65535) {
     throw new Error("invalid_config");
   }
   return config as CliConfig;
 }
 
 export function saveConfig(config: CliConfig): void {
-  mkdirSync(dataDirectory(), { recursive: true, mode: 0o700 });
-  writeFileSync(configPath(), JSON.stringify(config, null, 2) + "\n", { mode: 0o600 });
+  const directory = dataDirectory();
+  mkdirSync(directory, { recursive: true, mode: 0o700 });
+  if (process.platform !== "win32") chmodSync(directory, 0o700);
+  const temporary = join(directory, `.config-${process.pid}-${randomBytes(6).toString("hex")}.tmp`);
+  try {
+    writeFileSync(temporary, JSON.stringify(config, null, 2) + "\n", { flag: "wx", mode: 0o600 });
+    renameSync(temporary, configPath());
+    if (process.platform !== "win32") chmodSync(configPath(), 0o600);
+  } catch (error) {
+    try { if (existsSync(temporary)) unlinkSync(temporary); } catch {}
+    throw error;
+  }
 }
 
 export function newSecret(): string {

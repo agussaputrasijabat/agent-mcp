@@ -31,6 +31,36 @@ Tool berjalan dengan **izin akun sistem operasi yang menjalankan server**, bukan
 
 ## Mulai cepat
 
+### CLI standalone (tanpa mengatur `.env`)
+
+Binary CLI untuk macOS, Windows, dan Linux sedang disiapkan untuk distribusi npm. Paket npm **belum diterbitkan**. Dari source, buat paket untuk OS/arsitektur host dengan Bun:
+
+```bash
+bun install
+bun run package:npm
+npm pack ./dist/npm/package --pack-destination ./dist/npm
+npm install -g ./dist/npm/agent-mcp-1.0.0.tgz
+agent-mcp
+```
+
+Instalasi global hanya menggunakan binary Bun yang sudah dikompilasi dan launcher Node.js; pengguna paket tidak perlu memasang Bun. Paket lokal ini hanya untuk OS/arsitektur tempat paket dibuat. Pada penggunaan pertama, CLI meminta email dan password operator (minimal 12 karakter, dikonfirmasi dua kali), membuat secret aman, serta menyimpan SQLite dan konfigurasi secara lokal. **Tidak ada email/password default** dan tidak perlu membuat `.env`.
+
+Port preferensi CLI adalah **47831**, bukan 3000. Jika sudah dipakai, CLI memilih port lain yang kosong saat setup pertama, kemudian mempertahankan nomor itu di `config.json`. Perintah:
+
+```bash
+agent-mcp status
+agent-mcp open
+agent-mcp config show
+agent-mcp config set port auto
+agent-mcp config set port 47832
+agent-mcp auth reset-password
+agent-mcp stop
+```
+
+Ubah port hanya saat server berhenti. Alamat dashboard ditampilkan setelah setup. Endpoint MCP adalah `http://127.0.0.1:<port>/mcp`; akses dari layanan cloud tetap memerlukan tunnel HTTPS terpisah.
+
+### Pengembangan dari source
+
 **Prasyarat:** [Bun](https://bun.sh/) dan `bash` terpasang di mesin host.
 
 ```bash

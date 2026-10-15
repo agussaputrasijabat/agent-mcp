@@ -1,6 +1,8 @@
 # Konfigurasi
 
-Pengaturan awal dibaca dari variabel lingkungan saat server menyala. Di instalasi lokal, Bun otomatis membaca `.env`. Untuk PM2, gunakan `.env.production` sesuai [panduan deployment](run.md#pm2).
+**CLI standalone:** pengguna tidak perlu membuat `.env`. Pada eksekusi pertama, CLI meminta email/password operator dan membuat secret otomatis, menyimpannya di direktori data per pengguna. Preferensi port awal **47831**, dan jika bentrok saat setup CLI memilih port kosong lain. Setelahnya gunakan `agent-mcp config show`, `agent-mcp config set port <port|auto>`, atau `agent-mcp auth reset-password`. Binary kompilasi tidak memuat `.env` dan `bunfig.toml` secara otomatis.
+
+**Menjalankan server langsung dari source (Bun/PM2):** pengaturan dibaca dari variabel lingkungan saat server menyala, dan Bun membaca `.env` pada instalasi development. Untuk PM2, gunakan `.env.production` sesuai [panduan deployment](run.md#pm2). Nilai default `PORT=3000` dalam tabel di bawah hanya berlaku pada mode server langsung, **bukan** pada CLI standalone.
 
 ## Variabel lingkungan
 
