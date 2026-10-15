@@ -43,6 +43,11 @@ export type AppOptions = {
   port?: number;
 };
 
+function existingOperator(db: Database): boolean {
+  const table = db.query("SELECT name FROM sqlite_master WHERE type = ? AND name = ?").get("table", "user");
+  return !!table && !!db.query("SELECT id FROM user LIMIT 1").get();
+}
+
 export async function createApp(db: Database, options: AppOptions = {}) {
   const secret = options.secret ?? process.env.BETTER_AUTH_SECRET ?? "";
   if (secret.length < 32) throw new Error("auth_secret_missing");
@@ -50,10 +55,10 @@ export async function createApp(db: Database, options: AppOptions = {}) {
   const email = options.operator?.email ?? process.env.DASHBOARD_EMAIL ?? "";
   const password = options.operator?.password ?? process.env.DASHBOARD_PASSWORD ?? "";
   const envError = operatorEnvError(email, password);
-  if (envError) throw new Error(envError);
+  if (envError && !(envError === "operator_env_missing" && email && existingOperator(db))) throw new Error(envError);
 
   const auth = await createOperatorAuth(db, { secret, baseURL, port: serverPort(options.port) });
-  await seedOperator(auth, db, email, password);
+  if (password) await seedOperator(auth, db, email, password);
   ensureSettings(db, baseURL);
   const resource = mcpResourceUrl(baseURL);
 

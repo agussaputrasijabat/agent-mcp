@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { resourceNames, resourceText } from "../resources.ts";
 import { isValidName } from "./names.ts";
 
 const DESCRIPTION_LIMIT = 200;
@@ -83,13 +84,13 @@ export type EccSkill = { name: string; description: string; body: string };
 
 const defaultDirectory = join(import.meta.dir, "../../skills/ecc");
 
-export function loadEccSkills(directory = defaultDirectory): EccSkill[] {
-  const files = readdirSync(directory)
+export function loadEccSkills(directory?: string): EccSkill[] {
+  const files = (directory ? readdirSync(directory) : resourceNames("skills/ecc/").map((path) => path.slice("skills/ecc/".length)))
     .filter((file) => file.endsWith(".md"))
     .sort();
   const expected = eccSkillNames.map((name) => `${name}.md`);
   if (files.join("\n") !== expected.join("\n")) throw new Error("ecc_skill_set_mismatch");
-  return files.map((file) => parseSkillFile(file, readFileSync(join(directory, file), "utf8")));
+  return files.map((file) => parseSkillFile(file, directory ? readFileSync(join(directory, file), "utf8") : resourceText(`skills/ecc/${file}`)));
 }
 
 function parseSkillFile(file: string, text: string): EccSkill {

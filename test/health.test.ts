@@ -46,3 +46,21 @@ test("migrations apply twice and enable WAL with normal sync", () => {
   expect(migrations.count).toBe(4);
   second.close();
 });
+
+test("existing migrations retain legacy IDs after reopening", () => {
+  const directory = mkdtempSync(join(tmpdir(), "agent-mcp-migrations-"));
+  directories.push(directory);
+  const databasePath = join(directory, "agent.sqlite");
+
+  const first = openDatabase(databasePath);
+  first.exec("UPDATE schema_migrations SET id = substr(id, 12) WHERE id LIKE 'migrations/%'");
+  const before = first.query("SELECT id FROM schema_migrations ORDER BY id").all() as { id: string }[];
+  expect(before).toHaveLength(4);
+  expect(before.every(({ id }) => !id.includes("/"))).toBe(true);
+  first.close();
+
+  const second = openDatabase(databasePath);
+  const after = second.query("SELECT id FROM schema_migrations ORDER BY id").all() as { id: string }[];
+  expect(after).toEqual(before);
+  second.close();
+});

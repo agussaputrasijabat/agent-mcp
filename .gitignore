@@ -6,6 +6,7 @@ data/*.sqlite
 data/*.sqlite-*
 
 # output
+src/generated/
 out
 dist
 *.tgz

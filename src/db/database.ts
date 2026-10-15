@@ -1,5 +1,6 @@
-import { mkdirSync, readFileSync, readdirSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { mkdirSync } from "node:fs";
+import { dirname } from "node:path";
+import { resourceNames, resourceText } from "../resources.ts";
 import { Database } from "bun:sqlite";
 import { seedBuiltInSkills } from "../tools/skills.ts";
 
@@ -34,17 +35,15 @@ export function openDatabase(databasePath: string): Database {
 }
 
 function applyMigrations(db: Database): void {
-  const directory = join(import.meta.dir, "../../migrations");
-  const files = readdirSync(directory)
-    .filter((file) => file.endsWith(".sql"))
-    .sort();
+  const files = resourceNames("migrations/").filter((file) => file.endsWith(".sql")).sort();
   const applied = db.query("SELECT id FROM schema_migrations").all() as { id: string }[];
   const appliedIds = new Set(applied.map((row) => row.id));
 
   const insert = db.query("INSERT INTO schema_migrations (id, applied_at) VALUES (?, ?)");
   for (const file of files) {
-    if (appliedIds.has(file)) continue;
-    db.exec(readFileSync(join(directory, file), "utf8"));
-    insert.run(file, new Date().toISOString());
+    const migrationId = file.slice("migrations/".length);
+    if (appliedIds.has(migrationId) || appliedIds.has(file)) continue;
+    db.exec(resourceText(file));
+    insert.run(migrationId, new Date().toISOString());
   }
 }

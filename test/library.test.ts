@@ -325,7 +325,8 @@ test("fresh database includes ecc reviewer skills and keeps a custom body", () =
   expect(names.has("plan")).toBe(true);
   expect(names.has("browse")).toBe(true);
   for (const name of eccSkillNames) expect(names.has(name)).toBe(true);
-  expect(skillRead(first, { name: "typescript-reviewer" }).content[0].text).toBe(typescript?.body);
+  const reviewer = skillRead(first, { name: "typescript-reviewer" }).content[0];
+  expect(reviewer?.type === "text" ? reviewer.text : null).toBe(typescript?.body ?? null);
 
   const customBody = "Review kustom yang tidak boleh ditimpa.";
   expect(

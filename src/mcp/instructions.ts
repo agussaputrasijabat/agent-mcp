@@ -1,10 +1,8 @@
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { resourceText } from "../resources.ts";
 
-const instructionsPath = join(import.meta.dir, "../../prompts/server-instructions.txt");
-
-export function readServerInstructions(path = instructionsPath): string {
-  return readFileSync(path, "utf8").trim();
+export function readServerInstructions(path?: string): string {
+  return (path ? readFileSync(path, "utf8") : resourceText("prompts/server-instructions.txt")).trim();
 }
 
 export function assertInstructions(text: string): string {

@@ -1,4 +1,4 @@
-import { join } from "node:path";
+import { resourceBytes, resourceResponse } from "../resources.ts";
 import type { Database } from "bun:sqlite";
 import type { Context, Hono } from "hono";
 import { KeyValidationError, createApiKey, revokeApiKey } from "../auth/keys.ts";
@@ -9,7 +9,6 @@ import { skillDelete, skillRead, skillSave } from "../tools/skills.ts";
 import { fail, ok } from "./json.ts";
 import type { ToolResult } from "../tools/result.ts";
 
-const root = join(import.meta.dir, "../..");
 const hourMs = 60 * 60 * 1000;
 const monthMs = 30 * 24 * hourMs;
 
@@ -17,7 +16,7 @@ type OperatorCheck = (c: Context) => Promise<unknown>;
 
 export function registerDashboard(app: Hono, db: Database, operator: OperatorCheck) {
   app.get("/fonts/Geist-Variable.woff2", () => {
-    return new Response(Bun.file(join(root, "node_modules/geist/dist/fonts/geist-sans/Geist-Variable.woff2")));
+    return resourceResponse("node_modules/geist/dist/fonts/geist-sans/Geist-Variable.woff2", "font/woff2");
   });
 
   app.get("/api/api-keys", async (c) => {
@@ -168,23 +167,20 @@ export function registerDashboard(app: Hono, db: Database, operator: OperatorChe
   app.get("/tutorial", (c) => c.redirect("/docs"));
   app.get("/skills/:name", page);
   app.get("/favicon.svg", () => {
-    return new Response(Bun.file(join(root, "web/public/favicon.svg")), {
-      headers: { "content-type": "image/svg+xml; charset=utf-8" },
-    });
+    return resourceResponse("web/public/favicon.svg", "image/svg+xml; charset=utf-8");
   });
   app.get("/assets/*", async (c) => {
     const name = c.req.path.slice("/assets/".length);
     if (name.includes("..") || name.includes("/")) return new Response("Not found", { status: 404 });
-    const file = Bun.file(join(root, "dist/web/assets", name));
-    if (!(await file.exists())) return new Response("Not found", { status: 404 });
-    return new Response(file);
+    const contentType = name.endsWith(".js") ? "text/javascript; charset=utf-8" : name.endsWith(".css") ? "text/css; charset=utf-8" : name.endsWith(".woff2") ? "font/woff2" : "application/octet-stream";
+    return resourceResponse(`dist/web/assets/${name}`, contentType);
   });
 }
 
 export async function dashboardPage(): Promise<Response> {
-  const file = Bun.file(join(root, "dist/web/index.html"));
-  if (!(await file.exists())) return new Response("Dashboard build is missing", { status: 500 });
-  return new Response(file, { headers: { "content-type": "text/html; charset=utf-8" } });
+  const bytes = resourceBytes("dist/web/index.html");
+  if (!bytes) return new Response("Dashboard build is missing", { status: 500 });
+  return new Response(bytes.slice().buffer, { headers: { "content-type": "text/html; charset=utf-8" } });
 }
 
 function publicKey(row: { id: string; name: string; key_prefix: string; created_at: string; last_used_at: string | null; revoked_at: string | null }) {
