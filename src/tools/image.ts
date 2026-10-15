@@ -123,7 +123,7 @@ type Step = { edge: number | null; format: "png" | "jpeg" | "gif"; quality?: num
 function fitImage(path: string, mime: string, size: Size | undefined): Fitted | ToolResult {
   const directory = mkdtempSync(join(tmpdir(), "agent-mcp-image-"));
   let produced = false;
-  let lastError = "sips failed";
+  let lastError = "image conversion failed";
   try {
     let index = 0;
     for (const step of previewSteps(mime, size)) {
@@ -133,9 +133,10 @@ function fitImage(path: string, mime: string, size: Size | undefined): Fitted | 
       if (step.format === "jpeg" && step.quality !== undefined) args.push("-s", "formatOptions", String(step.quality));
       if (step.edge !== null) args.push("-Z", String(step.edge));
       args.push(path, "--out", dest);
-      const run = runSips(args);
+      const conversion = runFfmpeg(path, dest, step);
+      const run = conversion.ok ? conversion : runSips(args);
       if (!run.ok) {
-        lastError = run.message;
+        lastError = conversion.ok ? run.message : `${conversion.message}; ${run.message}`;
         continue;
       }
       const fitted = readFileSync(dest);
@@ -185,6 +186,25 @@ function sipsSize(path: string): Size | undefined {
   const parsed = { width: Number(width), height: Number(height) };
   if (parsed.width <= 0 || parsed.height <= 0) return undefined;
   return parsed;
+}
+
+function runFfmpeg(path: string, dest: string, step: Step): { ok: true } | { ok: false; message: string } {
+  const args = ["-hide_banner", "-loglevel", "error", "-nostdin", "-y", "-i", path, "-frames:v", "1"];
+  if (step.edge !== null) args.push("-vf", `scale=${step.edge}:${step.edge}:force_original_aspect_ratio=decrease`);
+  if (step.format === "jpeg" && step.quality !== undefined) {
+    args.push("-q:v", String(Math.round((100 - step.quality) / 4)));
+  }
+  args.push("-update", "1", dest);
+  try {
+    const result = Bun.spawnSync(["ffmpeg", ...args], { stdout: "pipe", stderr: "pipe" });
+    if (result.exitCode === 0) return { ok: true };
+    const line = result.stderr.toString("utf8").trim().split("\n")[0] ?? "ffmpeg failed";
+    return { ok: false, message: line.slice(0, 180) || "ffmpeg failed" };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "ffmpeg failed";
+    if (message.includes("ENOENT")) return { ok: false, message: "ffmpeg is not available" };
+    return { ok: false, message: message.slice(0, 180) };
+  }
 }
 
 function runSips(args: string[]): { ok: true; stdout: string } | { ok: false; message: string } {

@@ -4,7 +4,9 @@ Pilih cara menjalankan berdasarkan lokasi host. Semua pilihan memakai proses Bun
 
 ## Persiapan
 
-Pastikan [Bun](https://bun.sh/) dan `bash` tersedia. Dari root repository:
+Pastikan [Bun](https://bun.sh/) dan `bash` tersedia. Untuk membuat pratinjau gambar besar melalui `read_file`, instal **FFmpeg** pada Linux (misalnya `sudo apt install ffmpeg`). Di macOS, `sips` bawaan sistem juga bisa digunakan sebagai alternatif.
+
+Dari root repository:
 
 ```bash
 bun install
