@@ -1,0 +1,15 @@
+diff --git a/dist/node.mjs b/dist/node.mjs
+index 59a82ecde72c618c5afedc4ff9d7ce8e88f47b33..09cc4e9f0358b6016daa3a7c3ff1bf8fe2bf0ba1 100644
+--- a/dist/node.mjs
++++ b/dist/node.mjs
+@@ -35,7 +35,9 @@ const fetchClientMetadataResource = async (input, init) => {
+ 	});
+ 	if (addresses.length === 0) throw new TypeError("metadata hostname returned no DNS addresses");
+ 	for (const result of addresses) if (!isPublicRoutableHost(result.address)) throw new TypeError("metadata hostname must resolve only to public-routable addresses");
+-	const pinnedAddress = addresses[0];
++	// Prefer IPv4 on dual-stack hosts whose IPv6 route may be unavailable.
++	// Every DNS answer is still validated before selecting the pinned address.
++	const pinnedAddress = addresses.find((result) => result.family === 4) ?? addresses[0];
+ 	const headers = Object.fromEntries(webRequest.headers.entries());
+ 	headers.host = url.host;
+ 	const signal = init?.signal ?? (input instanceof Request ? input.signal : webRequest.signal);

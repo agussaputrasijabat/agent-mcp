@@ -1,0 +1,57 @@
+diff --git a/dist/authorize-K1WHCNih.mjs b/dist/authorize-K1WHCNih.mjs
+index 892e39ff5f37078ee30b8c950be5f12adf96262e..674011dbe07c8bc97ccdbb87e1dbe907db541063 100644
+--- a/dist/authorize-K1WHCNih.mjs
++++ b/dist/authorize-K1WHCNih.mjs
+@@ -1233,7 +1233,7 @@ const ALGORITHMS_LIST = [...PRIVATE_KEY_JWT_SIGNING_ALGORITHMS];
+ function isPrivateHostname(hostname) {
+ 	return !isPublicRoutableHost(hostname);
+ }
+-function validateJwksUri(ctx, jwksUri, clientIdUrlOrigin) {
++function validateJwksUri(ctx, jwksUri, clientIdUrlOrigin, opts, clientId) {
+ 	const parsed = new URL(jwksUri);
+ 	if (parsed.protocol !== "https:") throw new APIError$1("BAD_REQUEST", {
+ 		error_description: "jwks_uri must use HTTPS",
+@@ -1252,6 +1252,7 @@ function validateJwksUri(ctx, jwksUri, clientIdUrlOrigin) {
+ 		error: "invalid_client"
+ 	});
+ 	if (clientIdUrlOrigin && parsed.origin === clientIdUrlOrigin) return;
++	if (clientIdUrlOrigin && opts.isTrustedClientJwksUri?.(clientId, parsed.href) === true) return;
+ 	if (!ctx.context.isTrustedOrigin(parsed.href)) throw new APIError$1("BAD_REQUEST", {
+ 		error_description: "client jwks_uri is not trusted",
+ 		error: "invalid_client"
+@@ -1341,7 +1342,7 @@ async function fetchClientJwks(ctx, opts, client) {
+ 		error_description: "client discovery does not provide a metadata resource transport",
+ 		error: "invalid_client"
+ 	});
+-	validateJwksUri(ctx, client.jwksUri, client.clientDiscoveryId ? urlClientIdOrigin(client.clientId) : void 0);
++	validateJwksUri(ctx, client.jwksUri, client.clientDiscoveryId ? urlClientIdOrigin(client.clientId) : void 0, opts, client.clientId);
+ 	const now = Date.now();
+ 	const cacheKey = getJwksCacheKey(client);
+ 	const jwksCache = getJwksCache(opts);
+@@ -1849,7 +1850,7 @@ async function checkOAuthClient(client, opts, settings) {
+ 			});
+ 			if (settings?.ctx && !settings.ctx.context.isTrustedOrigin(uri.href)) {
+ 				const clientId = typeof clientWithDefaults.client_id === "string" ? clientWithDefaults.client_id : void 0;
+-				if (!(isClientMetadataDocument && clientId !== void 0 && URL.canParse(clientId) && new URL(clientId).origin === uri.origin)) throw new APIError("BAD_REQUEST", {
++				if (!(isClientMetadataDocument && clientId !== void 0 && URL.canParse(clientId) && (new URL(clientId).origin === uri.origin || opts.isTrustedClientJwksUri?.(clientId, uri.href) === true))) throw new APIError("BAD_REQUEST", {
+ 					error: "invalid_client_metadata",
+ 					error_description: "jwks_uri must belong to a trusted origin or the Client ID Metadata Document origin"
+ 				});
+diff --git a/dist/oauth-C_7TvkRL.d.mts b/dist/oauth-C_7TvkRL.d.mts
+index 11279b41bb6ce329ef73263e935d2a257df9ac02..40c332106ed8ce4f74edfc61fa8b533ddebd15a7 100644
+--- a/dist/oauth-C_7TvkRL.d.mts
++++ b/dist/oauth-C_7TvkRL.d.mts
+@@ -1075,6 +1075,13 @@ interface InitialAccessTokenAuthorization {
+   referenceId?: string;
+ }
+ interface OAuthOptions<Scopes extends readonly Scope[] = InternallySupportedScopes[]> {
++  /**
++   * Permit an explicitly trusted cross-origin JWKS resource for a discovered
++   * URL client. Applied during CIMD registration and private_key_jwt
++   * verification, after HTTPS, credential, fragment, and public-host checks.
++   * This policy does not add browser origins to trustedOrigins.
++   */
++  isTrustedClientJwksUri?: (clientId: string, jwksUri: string) => boolean;
+   /**
+    * Custom schema definitions
+    */

@@ -40,5 +40,10 @@
     "tailwindcss": "4.3.3",
     "typescript": "7.0.2",
     "vite": "8.3.4"
+  },
+  "patchedDependencies": {
+    "better-auth@1.7.7": "patches/better-auth@1.7.7.patch",
+    "@better-auth/cimd@1.7.7": "patches/@better-auth%2Fcimd@1.7.7.patch",
+    "@better-auth/oauth-provider@1.7.7": "patches/@better-auth%2Foauth-provider@1.7.7.patch"
   }
 }

@@ -6,6 +6,7 @@ import { betterAuth } from "better-auth";
 import { getMigrations } from "better-auth/db/migration";
 import { jwt } from "better-auth/plugins";
 import type { Database } from "bun:sqlite";
+import { isTrustedGoogleClientJwksUri } from "./client-jwks.ts";
 
 const hour = 60 * 60;
 const day = 24 * hour;
@@ -57,6 +58,7 @@ export async function createOperatorAuth(db: Database, options: { secret: string
         scopes: ["openid", "profile", "email", "offline_access", "mcp"],
         accessTokenExpiresIn: hour,
         refreshTokenExpiresIn: 30 * day,
+        isTrustedClientJwksUri: isTrustedGoogleClientJwksUri,
       }),
       cimd({
         fetchClientMetadataResource,
