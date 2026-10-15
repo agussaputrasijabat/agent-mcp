@@ -87,7 +87,7 @@ export function DocsPage() {
           <a className={textLink} href="/instructions/general.md" target="_blank" rel="noopener noreferrer">Non-coding</a> untuk dokumen, spreadsheet, riset, dan olah data.
         </p>
         <p>
-          web_fetch menolak localhost dan alamat jaringan privat. URL lokal diambil lewat shell dengan curl. Pencarian web memakai fitur bawaan ChatGPT atau Claude.
+          URL publik dan pencarian web memakai fetch dan search bawaan ChatGPT atau Claude. web_fetch hanya dipakai kalau halaman harus diambil dari mesin MCP, misalnya fetch bawaan gagal menjangkaunya. web_fetch menolak localhost dan alamat jaringan privat; URL lokal diambil lewat shell dengan curl.
         </p>
       </Block>
       <Block title="Konsol">

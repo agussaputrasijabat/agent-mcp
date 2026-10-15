@@ -240,7 +240,7 @@ export function createHostHandler(options: {
     server.registerTool(
       "web_fetch",
       {
-        description: "Fetch a URL from the MCP host when the client cannot reach it.",
+        description: "Fetch a public URL from the MCP host. Only use when the client's own web fetch cannot reach the URL or the host must fetch it; prefer the client's built-in fetch otherwise. Blocks localhost and private addresses.",
         inputSchema: webFetchInput,
         annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
       },

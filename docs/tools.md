@@ -62,6 +62,8 @@ Mengambil HTTP/HTTPS dari **mesin host**, dengan timeout 20 detik dan maksimum t
 
 Tool ini bukan mesin pencari web. Untuk pencarian situs atau dokumentasi publik, gunakan alat bawaan klien ChatGPT atau Claude.
 
+Instruksi dari `get_instructions` menyuruh model memakai fetch bawaan ChatGPT atau Claude untuk URL publik. `web_fetch` hanya dipakai kalau halaman harus diambil dari host, misalnya fetch bawaan klien gagal menjangkaunya, dan model menyebut alasannya dalam satu kalimat.
+
 ## Filesystem dan metadata
 
 | Tool | Fungsi |
