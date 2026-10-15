@@ -4,11 +4,17 @@ Terima kasih sudah meluangkan waktu untuk memperbaiki Agent MCP. Perubahan kecil
 
 Baca [README](README.md) untuk gambaran proyek dan [arsitektur](docs/architecture.md) sebelum mengubah bagian yang memengaruhi autentikasi atau eksekusi tool.
 
-## Sebelum membuka pull request
+## Sebelum membuat issue atau pull request
 
-- **Bug:** cari issue yang sudah ada. Bila belum ada, sertakan langkah reproduksi, hasil yang diharapkan, hasil aktual, dan versi Bun/OS host.
-- **Perubahan fitur:** jelaskan masalah yang ingin dipecahkan serta perilaku yang akan berubah. Untuk perubahan besar, diskusikan desain melalui issue lebih dulu.
-- **Masalah keamanan:** jangan sertakan exploit atau credential dalam issue publik. Ikuti [SECURITY.md](SECURITY.md).
+Buka [halaman Issues](https://github.com/agussaputrasijabat/agent-mcp/issues/new/choose) dan pilih formulir yang sesuai:
+
+- **Laporan Bug:** langkah reproduksi, hasil aktual dan yang diharapkan, lingkungan host, serta log yang sudah disamarkan.
+- **Usulan Fitur:** kebutuhan yang belum terpenuhi, solusi yang diusulkan, dan alternatif bila ada.
+- **Perbaikan Dokumentasi:** halaman yang bermasalah dan perubahan yang diperlukan.
+
+Cari issue serupa sebelum membuat yang baru. Formulir tersedia di [`.github/ISSUE_TEMPLATE`](.github/ISSUE_TEMPLATE/).
+
+**Masalah keamanan:** jangan sertakan exploit atau kredensial dalam issue publik. Ikuti [SECURITY.md](SECURITY.md) untuk pelaporan privat. Untuk perubahan fitur yang besar, diskusikan rancangan melalui issue lebih dulu.
 
 ## Menyiapkan lingkungan
 

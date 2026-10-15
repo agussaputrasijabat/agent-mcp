@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: "Laporan keamanan"
+    url: "https://github.com/agussaputrasijabat/agent-mcp/blob/main/SECURITY.md"
+    about: "Jangan publikasikan kerentanan keamanan sebagai issue. Ikuti cara pelaporan privat di sini."

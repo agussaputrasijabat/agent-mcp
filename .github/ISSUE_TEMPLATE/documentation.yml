@@ -1,0 +1,57 @@
+name: "Perbaikan Dokumentasi"
+description: "Laporkan panduan yang kurang jelas, salah, atau perlu ditambahkan."
+title: "[Dokumentasi]: "
+labels: ["documentation"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Gunakan formulir ini untuk README, panduan di folder `docs/`, dan instruksi kontribusi.
+        Jangan sertakan token, kredensial, atau informasi pribadi dalam contoh.
+  - type: input
+    id: location
+    attributes:
+      label: "Halaman atau bagian dokumentasi"
+      description: "Berikan path, judul bagian, atau tautan yang perlu diperbaiki."
+      placeholder: "Contoh: docs/clients.md — bagian OAuth"
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: "Jenis perbaikan"
+      options:
+        - "Informasi tidak akurat"
+        - "Penjelasan kurang jelas"
+        - "Contoh atau langkah belum lengkap"
+        - "Tautan rusak"
+        - "Dokumentasi baru"
+        - "Lainnya"
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: "Apa yang perlu diperbaiki?"
+      description: "Jelaskan bagian yang membingungkan, salah, atau belum tersedia."
+    validations:
+      required: true
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: "Perbaikan yang diharapkan"
+      description: "Jelaskan informasi yang sebaiknya ditambahkan atau diubah."
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: "Referensi tambahan"
+      description: "Opsional. Sertakan tautan dokumentasi resmi atau contoh yang relevan."
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: "Pemeriksaan awal"
+      options:
+        - label: "Saya sudah mencari issue serupa dan memastikan laporan ini tidak memuat data sensitif."
+          required: true

@@ -1,0 +1,79 @@
+name: "Laporan Bug"
+description: "Laporkan perilaku Agent MCP yang tidak berjalan sebagaimana mestinya."
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Terima kasih sudah melaporkan masalah. Cari issue serupa terlebih dahulu, lalu isi langkah reproduksi sejelas mungkin.
+
+        **Jangan sertakan API key, token OAuth, cookie, isi .env, atau data pribadi.**
+        Untuk kerentanan keamanan, ikuti [kebijakan keamanan](https://github.com/agussaputrasijabat/agent-mcp/blob/main/SECURITY.md), bukan issue publik.
+  - type: dropdown
+    id: component
+    attributes:
+      label: "Bagian yang bermasalah"
+      options:
+        - "Tool MCP (file, pencarian, shell, web_fetch)"
+        - "Autentikasi (OAuth / API key)"
+        - "Dashboard operator"
+        - "Memori atau skill"
+        - "Instalasi atau deployment"
+        - "Lainnya"
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: "Langkah reproduksi"
+      description: "Jelaskan cara memunculkan masalah dari kondisi awal."
+      placeholder: |
+        1. Jalankan ...
+        2. Buka / panggil ...
+        3. Amati ...
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: "Hasil aktual"
+      description: "Apa yang terjadi? Cantumkan pesan error yang sudah disamarkan bila ada."
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: "Hasil yang diharapkan"
+      description: "Apa yang semestinya terjadi?"
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: "Lingkungan"
+      description: "Sebutkan OS host, versi Bun, serta cara koneksi bila relevan."
+      placeholder: "Contoh: macOS 15, Bun 1.4.x, ChatGPT via OAuth"
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: "Versi Agent MCP"
+      description: "Commit hash atau versi yang digunakan, jika diketahui."
+      placeholder: "Contoh: ab9053b"
+  - type: textarea
+    id: evidence
+    attributes:
+      label: "Log atau tangkapan layar"
+      description: "Opsional. Hapus kredensial dan informasi sensitif sebelum menempelkan log."
+      placeholder: "Tempel log yang relevan atau seret gambar ke sini."
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: "Pemeriksaan awal"
+      options:
+        - label: "Saya sudah mencari issue serupa yang masih terbuka."
+          required: true
+        - label: "Laporan ini tidak memuat kredensial atau data sensitif."
+          required: true

@@ -1,0 +1,57 @@
+name: "Usulan Fitur"
+description: "Ajukan fitur baru atau peningkatan kemampuan Agent MCP."
+title: "[Fitur]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Jelaskan kebutuhan atau hambatan yang ingin diselesaikan, bukan hanya nama fitur.
+        Periksa issue yang sudah ada sebelum mengajukan usulan.
+  - type: dropdown
+    id: area
+    attributes:
+      label: "Area fitur"
+      options:
+        - "Tool MCP"
+        - "Koneksi klien dan autentikasi"
+        - "Dashboard operator"
+        - "Memori dan skill"
+        - "Instalasi dan deployment"
+        - "Lainnya"
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: "Masalah yang ingin diselesaikan"
+      description: "Apa yang sulit dilakukan sekarang? Sertakan contoh penggunaan nyata."
+      placeholder: "Saat menggunakan Agent MCP untuk ..., saya kesulitan karena ..."
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: "Solusi yang diusulkan"
+      description: "Jelaskan perilaku atau alur kerja yang diharapkan."
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: "Alternatif yang sudah dipertimbangkan"
+      description: "Opsional. Jelaskan solusi sementara atau pendekatan lain bila ada."
+  - type: textarea
+    id: context
+    attributes:
+      label: "Konteks tambahan"
+      description: "Opsional. Contoh perintah, ilustrasi, atau tautan yang membantu."
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: "Pemeriksaan awal"
+      options:
+        - label: "Saya sudah memeriksa apakah ada issue yang membahas usulan serupa."
+          required: true
+        - label: "Usulan ini menjelaskan kebutuhan dan hasil yang diharapkan."
+          required: true
