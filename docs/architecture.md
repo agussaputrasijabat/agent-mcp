@@ -41,7 +41,7 @@ Server tidak menjalankan model bahasa. Pilihan tool, konfirmasi user di chat, se
 | `src/db/` dan `migrations/` | Database, pengaturan, riwayat tool, dan migrasi. |
 | `src/http/` | API serta penyajian dashboard. |
 | `web/src/` | Halaman React dan komponen UI. |
-| `prompts/` | Instruksi server dan generator instruksi proyek. |
+| `prompts/` | Instruksi server (`server-instructions.txt`), pack instruksi per mode (`packs/`), dan template instruksi proyek (`project-stub.md`). |
 | `test/` | Tes integrasi dan pengujian tool. |
 
 ## Penyimpanan

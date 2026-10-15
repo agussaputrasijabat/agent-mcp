@@ -168,6 +168,14 @@ Contoh membaca skill repository:
 }
 ```
 
+## Instruksi
+
+| Tool | Input | Keterangan |
+| --- | --- | --- |
+| `get_instructions` | `mode`: `"coding"` atau `"general"` (default `"general"`) | Mengembalikan instruksi kerja lengkap beserta versinya. Dipanggil model di awal tiap chat sesuai instruksi proyek dari halaman Setup. |
+
+Isi instruksi berasal dari `prompts/packs/<mode>.md` ditambah `prompts/packs/shared.md`. Versi adalah 12 karakter pertama SHA-256 isinya, jadi berubah otomatis saat file diedit. Isi yang sama tersedia sebagai MCP prompt `coding` dan `general`, dan lewat HTTP publik di `/instructions/coding.md` dan `/instructions/general.md` (dengan `ETag`). Tes `test/instruction-packs.test.ts` gagal kalau ada tool terdaftar yang tidak disebut di pack.
+
 ## Pencatatan dan batas output
 
 Panggilan tool dicatat dalam tabel `tool_calls`, termasuk durasi, nama tool, hasil, dan status error. Server meredaksi sejumlah bentuk kredensial pada salinan audit, tetapi **jangan menganggap audit sebagai sistem penyaring semua rahasia**. Output teks panjang dapat dipotong; batas umum awalnya 30.000 karakter, sedangkan konten gambar ditangani berbeda.

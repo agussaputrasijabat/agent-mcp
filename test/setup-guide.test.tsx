@@ -18,12 +18,13 @@ test("setup guide documents project instructions for ChatGPT and Claude", () => 
 
 test("setup guide explains prerequisites and only confirms completed instructions", () => {
   const incomplete = renderToStaticMarkup(createElement(SetupInstructionsGuide, { ready: false, mcpName: "" }));
-  expect(incomplete).toContain("Lengkapi Path proyek dan Nama MCP");
+  expect(incomplete).toContain("Lengkapi Nama MCP");
+  expect(incomplete).toContain("get_instructions");
   expect(incomplete).toContain("hubungkan Agent MCP sebagai konektor");
   expect(incomplete).toContain("Panduan konektor MCP");
 
   const complete = renderToStaticMarkup(createElement(SetupInstructionsGuide, { ready: true, mcpName: "Agent Macbook" }));
   expect(complete).toContain("Agent Macbook");
   expect(complete).toContain("sudah siap disalin");
-  expect(complete).not.toContain("Lengkapi Path proyek dan Nama MCP agar");
+  expect(complete).not.toContain("Lengkapi Nama MCP");
 });

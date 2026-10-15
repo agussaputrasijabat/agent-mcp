@@ -22,7 +22,7 @@ export const setupGuides = {
       },
       {
         title: "Tempel instruksi dari Setup",
-        description: 'Isi Path proyek dan Nama MCP di atas, klik "Salin" pada panel Instruksi proyek, lalu tempel ke kolom instruksi ChatGPT. Simpan perubahan.',
+        description: 'Pilih mode, isi Nama MCP dan Path proyek di atas, klik "Salin" pada panel Instruksi proyek, lalu tempel ke kolom instruksi ChatGPT. Simpan perubahan.',
       },
       {
         title: "Mulai chat di dalam proyek",
@@ -46,7 +46,7 @@ export const setupGuides = {
       },
       {
         title: "Tempel instruksi dari Setup",
-        description: 'Isi Path proyek dan Nama MCP di atas, klik "Salin" pada panel Instruksi proyek, tempel teksnya, lalu klik "Save instructions".',
+        description: 'Pilih mode, isi Nama MCP dan Path proyek di atas, klik "Salin" pada panel Instruksi proyek, tempel teksnya, lalu klik "Save instructions".',
       },
       {
         title: "Mulai chat di dalam proyek",
@@ -103,7 +103,7 @@ export function SetupInstructionsGuide({ ready, mcpName }: { ready: boolean; mcp
           <p className="text-xs leading-5 text-muted-foreground" role="status">
             {ready
               ? <>Instruksi untuk konektor <strong className="font-semibold text-foreground">{mcpName}</strong> sudah siap disalin dari panel Instruksi proyek.</>
-              : "Lengkapi Path proyek dan Nama MCP agar tombol Salin pada panel Instruksi proyek aktif."}
+              : "Lengkapi Nama MCP, dan Path proyek untuk mode Coding, agar tombol Salin pada panel Instruksi proyek aktif."}
           </p>
         </div>
 
@@ -114,6 +114,10 @@ export function SetupInstructionsGuide({ ready, mcpName }: { ready: boolean; mcp
               <strong className="font-semibold text-foreground">Penting:</strong> Instruksi proyek hanya mengatur cara AI bekerja.
               Agar tool bisa dipanggil, hubungkan Agent MCP sebagai konektor secara terpisah di {guide.label}.
               Ketersediaan konektor bergantung pada paket dan izin akun.
+            </p>
+            <p>
+              Isi instruksi lengkap diambil dari server lewat tool get_instructions, jadi update agent-mcp tidak perlu mengedit ulang proyek.
+              Tempel ulang hanya kalau nama MCP, path, mode, atau catatan proyek berubah.
             </p>
             <div className="flex flex-wrap gap-x-4 gap-y-2">
               <a href={guide.projectUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-primary underline-offset-4 hover:underline">

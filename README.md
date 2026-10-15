@@ -102,7 +102,7 @@ Panduan lengkap: [instalasi dan deployment](docs/run.md) serta [konfigurasi](doc
 1. Jalankan Agent MCP di host dan tentukan apakah akan memakai **tunnel** atau **URL HTTPS publik**.
 2. Pilih autentikasi. **OAuth** menggunakan alur login dan consent operator. **API key** dibuat di menu **Kunci** dan hanya ditampilkan satu kali.
 3. Tambahkan server di klien MCP yang mendukung metode koneksi tersebut. Untuk koneksi berbasis URL, gunakan `https://domain-kamu/mcp`.
-4. Buka **Setup** di dashboard. Masukkan path absolut repository pada host dan nama konektor, lalu salin instruksi yang dihasilkan ke instruksi proyek ChatGPT atau Claude.
+4. Buka **Setup** di dashboard. Pilih mode Coding atau Non-coding, masukkan nama konektor dan path absolut repository pada host, lalu salin teks pendek yang dihasilkan ke instruksi proyek ChatGPT atau Claude. Instruksi lengkap diambil model lewat tool `get_instructions`, jadi update server tidak perlu mengedit ulang proyek.
 5. Minta klien menjalankan tool sederhana seperti `glob` atau `read_file`, kemudian periksa hasilnya di **Feed**.
 
 Detail per klien, cara mengirim API key, OAuth, dan tunnel: [docs/clients.md](docs/clients.md).

@@ -4,11 +4,10 @@ import { dirname, join } from "node:path";
 const root = join(import.meta.dir, "..");
 const paths = [
   "prompts/server-instructions.txt",
-  "prompts/project-instructions.md",
   "web/public/favicon.svg",
   "node_modules/geist/dist/fonts/geist-sans/Geist-Variable.woff2",
 ];
-for (const dir of ["migrations", "skills/ecc", "dist/web", "dist/web/assets"]) {
+for (const dir of ["migrations", "prompts/packs", "skills/ecc", "dist/web", "dist/web/assets"]) {
   for (const entry of readdirSync(join(root, dir), { withFileTypes: true })) {
     if (entry.isFile()) paths.push(`${dir}/${entry.name}`);
   }

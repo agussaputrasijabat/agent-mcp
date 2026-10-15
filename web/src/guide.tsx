@@ -1,15 +1,22 @@
 import { useEffect, useState, type ReactNode } from "react";
-import projectInstructions from "../../prompts/project-instructions.md?raw";
+import projectStub from "../../prompts/project-stub.md?raw";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { chatInstructions, fillProjectPrompt } from "./project-prompt.ts";
+import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
+import { fillStub, instructionsUrl, PROJECT_INSTRUCTIONS_LIMIT, publicOrigin, type StubMode } from "./project-prompt.ts";
 import { SetupInstructionsGuide } from "./setup-guide.tsx";
 
-const chatSection = chatInstructions(projectInstructions);
 const projectStorageKey = "agent-mcp-setup-project-root";
 const nameStorageKey = "agent-mcp-setup-mcp-name";
+const modeStorageKey = "agent-mcp-setup-mode";
+const notesStorageKey = "agent-mcp-setup-notes";
+const stubModes: { value: StubMode; label: string; description: string }[] = [
+  { value: "coding", label: "Coding", description: "Agen coding: eksplorasi repo, edit kode, tes, dan git sesuai permintaan." },
+  { value: "general", label: "Non-coding", description: "Asisten kerja: dokumen, spreadsheet, PDF, riset, dan olah data." },
+];
 const textLink = "text-foreground underline-offset-4 hover:text-primary";
 
 function stored(key: string): string {
@@ -72,23 +79,15 @@ export function DocsPage() {
         </p>
       </Block>
       <Block title="Tool">
-        <ul className="list-disc pl-5">
-          <li>read_file membaca file.</li>
-          <li>write_file membuat file atau menimpa seluruh isi.</li>
-          <li>edit_file mengubah sebagian file.</li>
-          <li>glob mencari path.</li>
-          <li>grep mencari isi file.</li>
-          <li>shell menjalankan perintah, git, tes, dan install.</li>
-          <li>web_fetch mengambil URL dari mesin MCP. URL publik memakai fetch atau browse bawaan ChatGPT atau Claude dulu. web_fetch untuk localhost, jaringan privat, atau saat fetch bawaan tidak menjangkau URL itu.</li>
-          <li>memory_search, memory_save, dan memory_forget menyimpan catatan antar chat.</li>
-          <li>skill_list, skill_read, skill_save, dan skill_delete menyimpan prosedur tetap.</li>
-        </ul>
-        <p>Pencarian web memakai fitur bawaan ChatGPT atau Claude. Tool web_search tidak ada di server ini.</p>
         <p>
-          Jika pengguna minta rencana, model memanggil skill_read untuk skill bawaan bernama plan, lalu mengikuti skill itu. Pertanyaan, pilihan, dan rencana tetap di chat klien.
+          Server menyediakan tool untuk file dan folder, shell dan proses panjang, eksekusi kode, dokumen (DOCX, PDF, spreadsheet), preview file, web_fetch, memori, dan skill. Daftar lengkap beserta aturan pakainya ada di instruksi yang diambil model lewat tool get_instructions.
         </p>
         <p>
-          Berkas instruksi user dan global dicari di direktori home, ~/.claude, ~/.codex, dan ~/.cursor. Setelah itu berkas di folder yang sedang disentuh, naik sampai akar proyek. Berkas yang lebih dalam menang. Berkas proyek menang atas berkas user. Instruksi di chat menang atas semua berkas.
+          Ada dua mode instruksi. <a className={textLink} href="/instructions/coding.md" target="_blank" rel="noopener noreferrer">Coding</a> untuk kerja di repo: eksplorasi, edit, tes, dan git.{" "}
+          <a className={textLink} href="/instructions/general.md" target="_blank" rel="noopener noreferrer">Non-coding</a> untuk dokumen, spreadsheet, riset, dan olah data.
+        </p>
+        <p>
+          web_fetch menolak localhost dan alamat jaringan privat. URL lokal diambil lewat shell dengan curl. Pencarian web memakai fitur bawaan ChatGPT atau Claude.
         </p>
       </Block>
       <Block title="Konsol">
@@ -144,7 +143,10 @@ export function DocsPage() {
       </Block>
       <Block title="Instruksi proyek">
         <p>
-          Buka <a className={textLink} href="/setup">Setup</a>. Isi path absolut proyek di mesin MCP, dan nama MCP yang sama dengan nama di konektor. Setelah keduanya terisi, salin teks yang dihasilkan. Tempel ke custom instructions proyek di ChatGPT atau Claude.
+          Buka <a className={textLink} href="/setup">Setup</a>. Pilih mode, isi nama MCP yang sama dengan nama konektor, dan path proyek. Salin teks pendek yang dihasilkan ke custom instructions proyek di ChatGPT atau Claude.
+        </p>
+        <p>
+          Teks itu menyuruh model memanggil get_instructions di awal tiap chat. Isi lengkapnya ikut versi server yang sedang jalan, jadi update agent-mcp tidak perlu mengedit ulang proyek. Tempel ulang hanya kalau nama MCP, path, mode, atau catatan proyek berubah.
         </p>
       </Block>
       <Block title="Kerja biasa">
@@ -159,22 +161,50 @@ export function DocsPage() {
 export function SetupPage() {
   const [projectRoot, setProjectRoot] = useState(() => stored(projectStorageKey));
   const [mcpName, setMcpName] = useState(() => stored(nameStorageKey));
+  const [mode, setMode] = useState<StubMode>(() => (stored(modeStorageKey) === "general" ? "general" : "coding"));
+  const [notes, setNotes] = useState(() => stored(notesStorageKey));
+  const [version, setVersion] = useState("");
   const [copied, setCopied] = useState(false);
   const [copyFailed, setCopyFailed] = useState(false);
   const root = projectRoot.trim();
   const name = mcpName.trim();
-  const ready = root.length > 0 && name.length > 0;
-  const prompt = ready ? fillProjectPrompt(chatSection, root, name) : chatSection;
+  const ready = name.length > 0 && (mode === "general" || root.length > 0);
+  const url = instructionsUrl(window.location.origin, mode);
+  const fallbackUsable = publicOrigin(window.location.protocol, window.location.hostname);
+  const prompt = fillStub(projectStub, {
+    root: root || (mode === "coding" ? "PROJECT_ROOT" : ""),
+    name: name || "MCP_NAME",
+    mode,
+    url: fallbackUsable ? url : "",
+    notes,
+  });
+  const tooLong = prompt.length > PROJECT_INSTRUCTIONS_LIMIT;
+  const canCopy = ready && !tooLong;
   const endpoint = `${window.location.origin}/mcp`;
 
   useEffect(() => {
     try {
       localStorage.setItem(projectStorageKey, projectRoot);
       localStorage.setItem(nameStorageKey, mcpName);
+      localStorage.setItem(modeStorageKey, mode);
+      localStorage.setItem(notesStorageKey, notes);
     } catch {
       /* storage unavailable */
     }
-  }, [projectRoot, mcpName]);
+  }, [projectRoot, mcpName, mode, notes]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setVersion("");
+    fetch(url, { method: "HEAD", signal: controller.signal })
+      .then((response) => {
+        if (!controller.signal.aborted) setVersion(response.ok ? (response.headers.get("etag") ?? "").replaceAll("\"", "") : "");
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setVersion("");
+      });
+    return () => controller.abort();
+  }, [url]);
 
   useEffect(() => {
     if (!copied) return;
@@ -182,14 +212,7 @@ export function SetupPage() {
     return () => window.clearTimeout(timer);
   }, [copied]);
 
-  function editRoot(value: string) {
-    setProjectRoot(value);
-    setCopied(false);
-    setCopyFailed(false);
-  }
-
-  function editName(value: string) {
-    setMcpName(value);
+  function edited() {
     setCopied(false);
     setCopyFailed(false);
   }
@@ -211,18 +234,44 @@ export function SetupPage() {
         <Card>
           <CardHeader>
             <CardTitle><h2>Konfigurasi koneksi</h2></CardTitle>
-            <CardDescription>Path proyek dan nama konektor mengganti placeholder di instruksi. Endpoint mengikuti origin halaman ini.</CardDescription>
+            <CardDescription>Instruksi proyek hanya berisi nama konektor, folder, dan mode. Isi lengkapnya diambil dari server ini di awal tiap chat.</CardDescription>
           </CardHeader>
           <CardContent>
             <FieldGroup className="gap-3">
+              <FieldSet aria-describedby="setup-mode-description">
+                <FieldLegend variant="label">Mode</FieldLegend>
+                <div className="flex gap-1 rounded-lg bg-muted/70 p-1">
+                  {stubModes.map((item) => (
+                    <button
+                      key={item.value}
+                      type="button"
+                      aria-pressed={mode === item.value}
+                      onClick={() => {
+                        setMode(item.value);
+                        edited();
+                      }}
+                      className={cn(
+                        "min-h-10 flex-1 rounded-md px-3 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+                        mode === item.value ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+                <FieldDescription id="setup-mode-description">{stubModes.find((item) => item.value === mode)?.description}</FieldDescription>
+              </FieldSet>
               <Field>
-                <FieldLabel htmlFor="project-root">Path proyek</FieldLabel>
+                <FieldLabel htmlFor="project-root">{mode === "coding" ? "Path proyek" : "Folder kerja (opsional)"}</FieldLabel>
                 <Input
                   id="project-root"
                   value={projectRoot}
                   autoComplete="off"
                   spellCheck={false}
-                  onChange={(event) => editRoot(event.target.value)}
+                  onChange={(event) => {
+                    setProjectRoot(event.target.value);
+                    edited();
+                  }}
                 />
                 <FieldDescription>Path absolut di mesin tempat MCP berjalan.</FieldDescription>
               </Field>
@@ -233,9 +282,25 @@ export function SetupPage() {
                   value={mcpName}
                   autoComplete="off"
                   spellCheck={false}
-                  onChange={(event) => editName(event.target.value)}
+                  onChange={(event) => {
+                    setMcpName(event.target.value);
+                    edited();
+                  }}
                 />
                 <FieldDescription>Nama yang diketik saat menambah konektor di ChatGPT atau Claude.</FieldDescription>
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="project-notes">Catatan proyek (opsional)</FieldLabel>
+                <Textarea
+                  id="project-notes"
+                  value={notes}
+                  spellCheck={false}
+                  onChange={(event) => {
+                    setNotes(event.target.value);
+                    edited();
+                  }}
+                />
+                <FieldDescription>Aturan khusus proyek ini, misalnya perintah tes atau gaya penulisan. Ikut ditempel ke instruksi proyek.</FieldDescription>
               </Field>
               <Field>
                 <FieldLabel htmlFor="mcp-endpoint">Endpoint</FieldLabel>
@@ -244,19 +309,23 @@ export function SetupPage() {
             </FieldGroup>
           </CardContent>
         </Card>
-        <SetupInstructionsGuide ready={ready} mcpName={name} />
+        <SetupInstructionsGuide ready={canCopy} mcpName={name} />
       </div>
       <Card>
         <CardHeader>
           <CardTitle><h2>Instruksi proyek</h2></CardTitle>
           <CardDescription>
-            {ready
-              ? "Teks ini siap ditempel ke custom instructions proyek."
-              : "Isi path proyek dan nama MCP. Selama salah satu kosong, teks di bawah masih memakai PROJECT_ROOT dan MCP_NAME."}
+            {canCopy
+              ? "Teks ini siap ditempel ke custom instructions proyek. Update agent-mcp tidak perlu tempel ulang."
+              : tooLong
+                ? "Teks terlalu panjang untuk ChatGPT. Pendekkan catatan proyek."
+                : mode === "coding"
+                ? "Isi path proyek dan nama MCP. Selama salah satu kosong, teks di bawah masih memakai placeholder."
+                : "Isi nama MCP. Selama kosong, teks di bawah masih memakai placeholder."}
           </CardDescription>
           {ready ? (
             <CardAction>
-              <Button type="button" onClick={() => void copyPrompt()}>{copied ? "Tersalin" : "Salin"}</Button>
+              <Button type="button" disabled={tooLong} aria-describedby="setup-length" onClick={() => void copyPrompt()}>{copied ? "Tersalin" : "Salin"}</Button>
             </CardAction>
           ) : null}
         </CardHeader>
@@ -268,6 +337,20 @@ export function SetupPage() {
           >
             {prompt}
           </pre>
+          <p id="setup-length" className={cn("text-xs", tooLong ? "text-destructive" : "text-muted-foreground")}>
+            {prompt.length.toLocaleString("id-ID")} / {PROJECT_INSTRUCTIONS_LIMIT.toLocaleString("id-ID")} karakter
+            {tooLong ? ". Batas ChatGPT terlewati, pendekkan catatan proyek." : null}
+          </p>
+          {tooLong ? <p className="sr-only" role="alert">Instruksi melewati batas 8.000 karakter. Tombol Salin dinonaktifkan.</p> : null}
+          <p className="text-xs text-muted-foreground">
+            Instruksi lengkap mode ini: <a className={textLink} href={url} target="_blank" rel="noopener noreferrer">{url}</a>
+            {version ? <> (versi <code className="font-mono">{version}</code>)</> : null}
+          </p>
+          {fallbackUsable ? null : (
+            <p className="text-xs text-muted-foreground">
+              Halaman ini dibuka lewat alamat lokal, jaringan privat, atau tanpa HTTPS, jadi URL cadangan tidak dimasukkan ke instruksi. ChatGPT dan Claude tidak bisa membuka alamat itu. Tool get_instructions tetap jalan lewat konektor. Buka Setup dari origin HTTPS publik kalau ingin URL cadangan ikut disertakan.
+            </p>
+          )}
         </CardContent>
       </Card>
     </div>

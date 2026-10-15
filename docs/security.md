@@ -38,7 +38,7 @@ Feed dan SQLite menyimpan nama tool, waktu, argumen, hasil, serta status error. 
 
 ## Jaringan dan `web_fetch`
 
-`web_fetch` berjalan di host, bukan dari browser operator. Implementasi saat ini memblokir alamat privat, loopback, dan bentuk alamat tertentu yang tidak aman. Karena itu, instruksi yang menyarankan `web_fetch` untuk localhost/LAN belum sesuai dengan perilaku tool sekarang. Jangan membuka akses jaringan privat hanya untuk mengatasi pesan `fetch_blocked` tanpa meninjau risiko SSRF.
+`web_fetch` berjalan di host, bukan dari browser operator. Implementasi saat ini memblokir alamat privat, loopback, dan bentuk alamat tertentu yang tidak aman. Instruksi dari `get_instructions` mengarahkan URL localhost/LAN ke `shell` dengan curl. Jangan membuka akses jaringan privat hanya untuk mengatasi pesan `fetch_blocked` tanpa meninjau risiko SSRF.
 
 ## Laporan kerentanan
 

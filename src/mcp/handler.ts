@@ -47,6 +47,7 @@ import {
   skillSaveInput,
 } from "../tools/skills.ts";
 import { fetchUrl, webFetchInput } from "../tools/web-fetch.ts";
+import { getInstructions, getInstructionsInput, instructionModes, readInstructionPack } from "./instructions.ts";
 
 const readOnly = { readOnlyHint: true } as const;
 const writeAnnotations = {
@@ -220,6 +221,22 @@ export function createHostHandler(options: {
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true } },
       async (input, ctx) => traced(db, "open_in_folder", input, ctx, () => openInFolder(input)));
 
+    server.registerTool(
+      "get_instructions",
+      {
+        description: "Return the full working instructions for this server. Call once at the start of every chat with the mode named in the project instructions: coding or general.",
+        inputSchema: getInstructionsInput,
+        annotations: readOnly,
+      },
+      async (input, ctx) => traced(db, "get_instructions", input, ctx, () => getInstructions(input)),
+    );
+    for (const mode of instructionModes) {
+      server.registerPrompt(
+        mode,
+        { title: `agent-mcp ${mode} instructions`, description: `Working instructions for ${mode} work on this host.` },
+        () => ({ messages: [{ role: "user" as const, content: { type: "text" as const, text: readInstructionPack(mode).text } }] }),
+      );
+    }
     server.registerTool(
       "web_fetch",
       {

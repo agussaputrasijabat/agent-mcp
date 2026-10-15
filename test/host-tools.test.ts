@@ -364,7 +364,7 @@ test("tools/list exposes host and document tools with instructions", async () =>
     "read_docx", "create_docx", "edit_docx", "search_docx",
     "preview_file", "open_in_folder",
     "web_fetch", "memory_search", "memory_save", "memory_forget",
-    "skill_list", "skill_read", "skill_save", "skill_delete",
+    "skill_list", "skill_read", "skill_save", "skill_delete", "get_instructions",
   ]));
   const read = listed.body.result?.tools?.find((tool) => tool.name === "read_file");
   const shell = listed.body.result?.tools?.find((tool) => tool.name === "shell");

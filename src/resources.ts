@@ -9,6 +9,10 @@ export function registerBundledResources(resources: Record<string, string>): voi
   bundled = resources;
 }
 
+export function resourcesBundled(): boolean {
+  return bundled !== undefined;
+}
+
 export function resourceNames(prefix: string): string[] {
   if (bundled) return Object.keys(bundled).filter((name) => name.startsWith(prefix)).sort();
   const dir = join(sourceRoot, prefix);
