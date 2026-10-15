@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "./api.ts";
-import { Failed, LoadingRows, formatWhen } from "./shell.tsx";
+import { Failed, LoadingRows, formatDuration, formatWhen } from "./shell.tsx";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -17,6 +17,7 @@ type CallRow = {
   id: string;
   tool_name: string;
   started_at: string;
+  duration_ms: number | null;
   is_error: number;
 };
 
@@ -112,6 +113,7 @@ export function SessionDetailPage({ sessionKey }: { sessionKey: string }) {
               <TableRow>
                 <TableHead>Tool</TableHead>
                 <TableHead>Waktu</TableHead>
+                <TableHead>Durasi</TableHead>
                 <TableHead>Status</TableHead>
               </TableRow>
             </TableHeader>
@@ -120,6 +122,7 @@ export function SessionDetailPage({ sessionKey }: { sessionKey: string }) {
                 <TableRow key={row.id}>
                   <TableCell>{row.tool_name}</TableCell>
                   <TableCell>{formatWhen(row.started_at)}</TableCell>
+                  <TableCell className="tabular-nums">{formatDuration(row.duration_ms)}</TableCell>
                   <TableCell>
                     {row.is_error ? <Badge variant="destructive">error</Badge> : <Badge>ok</Badge>}
                   </TableCell>
