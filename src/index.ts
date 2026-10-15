@@ -29,10 +29,11 @@ try {
   throw error;
 }
 
-Bun.serve({
+export const applicationFetch = app.fetch;
+export const server = Bun.serve({
   hostname: host,
   port,
-  fetch: app.fetch,
+  fetch: applicationFetch,
 });
 
 console.log(JSON.stringify({ level: "info", msg: "listening", host, port }));

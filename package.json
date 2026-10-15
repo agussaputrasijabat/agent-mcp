@@ -7,6 +7,8 @@
   "scripts": {
     "dev": "bun run build && bun --watch src/index.ts",
     "build": "vite build",
+    "build:binary": "bun run build && bun scripts/build-binary.ts",
+    "typecheck": "tsc --noEmit",
     "start": "bun run build && bun src/index.ts",
     "start:prod": "bun --no-env-file run build && bun --no-env-file --env-file=.env.production src/index.ts",
     "test": "bun test",
