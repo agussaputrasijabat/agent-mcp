@@ -113,12 +113,18 @@ Detail per klien, cara mengirim API key, OAuth, dan tunnel: [docs/clients.md](do
 | --- | --- | --- |
 | File | `read_file`, `write_file`, `edit_file` | Baca, buat, atau ubah file |
 | Pencarian | `glob`, `grep` | Cari file atau teks |
-| Eksekusi | `shell` | Jalankan perintah Bash di host |
+| Eksekusi | `shell`, `start_process`, `read_process_output`, `write_process_input`, `list_processes`, `terminate_process`, `execute_code` | Terminal, sesi proses, dan eksekusi kode tanpa file |
+| Direktori | `list_directory`, `create_directory`, `move_path`, `stat_path` | Kelola direktori dan metadata |
+| Analisis | `analyze_data` | Profil data CSV, JSON, dan workbook |
+| Excel | `read_spreadsheet`, `create_spreadsheet`, `edit_spreadsheet`, `search_spreadsheet` | Baca, buat, ubah, dan cari XLSX |
+| PDF | `read_pdf`, `create_pdf`, `edit_pdf` | Ekstraksi dan operasi dasar PDF |
+| DOCX | `read_docx`, `create_docx`, `edit_docx`, `search_docx` | Baca, buat, edit teks, cari dokumen Word |
+| Preview | `preview_file`, `open_in_folder` | MCP Apps file preview dan buka lokasi pada host |
 | HTTP | `web_fetch` | Ambil URL dari host MCP |
 | Memori | `memory_search`, `memory_save`, `memory_forget` | Cari, simpan, atau hapus catatan |
 | Skill | `skill_list`, `skill_read`, `skill_save`, `skill_delete` | Kelola prosedur yang bisa dipakai ulang |
 
-Total **14 tool**. `read_file` juga dapat menampilkan berkas gambar yang didukung. `skill_list` bisa menemukan skill di `.agents/skills`, `.claude/skills`, `.codex/skills`, dan `.opencode/commands` bila diberi `project_path`.
+Total **38 tool**. `read_file` juga dapat menampilkan berkas gambar yang didukung. Preview interaktif memerlukan klien yang mendukung **MCP Apps**; klien lain tetap menerima hasil teks/gambar biasa. Dukungan `.xls` binary belum tersedia, dan `.xlsm` hanya dapat dibaca (penulisan dinonaktifkan agar macro tidak hilang). PDF Markdown menggunakan font Latin-1; pengeditan DOCX dibatasi pada teks dalam satu XML run. `skill_list` bisa menemukan skill di `.agents/skills`, `.claude/skills`, `.codex/skills`, dan `.opencode/commands` bila diberi `project_path`.
 
 Agent MCP **tidak menyediakan `web_search`**. Gunakan pencarian web bawaan klien untuk pencarian umum. [Referensi lengkap setiap tool](docs/tools.md).
 

@@ -9,7 +9,7 @@ flowchart TD
     client["ChatGPT / Claude MCP client"] --> http["Hono + MCP HTTP"]
     browser["Browser operator"] --> dashboard["Dashboard + API"]
     http --> auth["API key / OAuth"]
-    auth --> handler["MCP handler: 14 tool"]
+    auth --> handler["MCP handler: 38 tool"]
     handler --> host["File system / Bash / HTTP fetch"]
     handler --> audit[("SQLite: tool_calls")]
     handler --> library[("SQLite: memory dan skill")]
@@ -20,7 +20,7 @@ flowchart TD
 
 1. Klien mengirim permintaan Streamable HTTP ke `/mcp`.
 2. Middleware memeriksa API key atau mengarahkan bearer OAuth ke validasi Better Auth.
-3. Handler MCP membuat server untuk permintaan tersebut dan mendaftarkan 14 tool.
+3. Handler MCP membuat server untuk permintaan tersebut dan mendaftarkan 38 tool beserta resource MCP Apps untuk File Preview.
 4. Tool dieksekusi di host. Panggilan dicatat di tabel `tool_calls` saat dimulai dan diperbarui setelah selesai.
 5. Klien menerima hasil; operator dapat melihatnya melalui Feed dan halaman Sesi.
 
@@ -32,9 +32,11 @@ Server tidak menjalankan model bahasa. Pilihan tool, konfirmasi user di chat, se
 | --- | --- |
 | `src/index.ts` | Membaca port, membuka database, lalu memulai `Bun.serve`. |
 | `src/app.ts` | Menggabungkan route MCP, OAuth, login, sesi, dan health check. |
-| `src/mcp/handler.ts` | Mendaftarkan 14 tool dan membungkus eksekusi dengan pencatatan audit. |
+| `src/mcp/handler.ts` | Mendaftarkan 38 tool dan preview resource, lalu membungkus eksekusi dengan pencatatan audit. |
 | `src/mcp/request-context.ts` | Membawa konteks autentikasi permintaan ke audit. |
-| `src/tools/` | Implementasi file, shell, fetch, memori, dan skill. |
+| `src/tools/` | Implementasi file, shell, proses, spreadsheet, PDF, DOCX, preview, fetch, memori, dan skill. |
+| `web/src/mcp-preview.ts` | View MCP Apps untuk preview dan editor Markdown. |
+| `scripts/build-mcp-preview.ts` | Mengemas view menjadi HTML mandiri untuk server dan binary. |
 | `src/auth/` | API key, autentikasi operator, OAuth, dan pembatasan login. |
 | `src/db/` dan `migrations/` | Database, pengaturan, riwayat tool, dan migrasi. |
 | `src/http/` | API serta penyajian dashboard. |

@@ -17,7 +17,7 @@ Ini **bukan** isolasi sistem operasi. `read_file`, `write_file`, `edit_file`, da
 
 Agent MCP mengirim anotasi MCP `readOnlyHint`, `destructiveHint`, dan `openWorldHint`. Konfirmasi dilakukan oleh **aplikasi klien** (ChatGPT atau Claude) sebelum tool dipanggil, sesuai pengaturan izin dan kebijakan klien. Server tidak meminta `approval_id`, tidak menyediakan persetujuan terpisah, dan tidak memaksa operator membuka dashboard.
 
-Tool `shell`, `write_file`, `edit_file`, `memory_forget`, dan `skill_delete` ditandai berpotensi destruktif. Penulisan memori/skill juga ditandai sebagai operasi perubahan data; operasi baca memiliki `readOnlyHint: true`.
+Tool `shell`, `start_process`, `execute_code`, `write_file`, `edit_file`, `move_path`, operasi penulisan dokumen, `terminate_process`, `memory_forget`, dan `skill_delete` ditandai berpotensi destruktif. Penulisan memori/skill juga ditandai sebagai operasi perubahan data; operasi baca memiliki `readOnlyHint: true`.
 
 **Batas keamanan:** Anotasi MCP adalah petunjuk, bukan mekanisme otorisasi. Tidak semua klien atau konfigurasi akan memunculkan dialog; izin yang disimpan/diingat oleh klien juga bisa meniadakan dialog berikutnya. Jika klien mengirim pemanggilan tool yang sudah diizinkan oleh autentikasi MCP, server menjalankannya dengan hak akses OS proses. Periksa izin tool klien dan gunakan akun OS dengan hak minimum. Konfirmasi klien bukan sandbox.
 
@@ -34,7 +34,7 @@ Tool `shell`, `write_file`, `edit_file`, `memory_forget`, dan `skill_delete` dit
 
 ## Audit dan rahasia
 
-Feed dan SQLite menyimpan nama tool, waktu, argumen, hasil, serta status error. Audit meredaksi kredensial koneksi yang diketahui, isi perubahan file sensitif, dan hasil `read_file` pada path sensitif. Isi perintah shell serta output-nya tidak disimpan mentah di tabel audit. Tabel approval dari versi terdahulu tetap berada dalam skema SQLite untuk kompatibilitas, tetapi tidak lagi digunakan untuk pemanggilan tool. Respons ke klien tetap berisi hasil tool yang sebenarnya. Shell arbitrer masih dapat mengeluarkan rahasia dengan bentuk yang tidak dikenali penyaring; jangan menganggap audit telah bebas dari seluruh informasi sensitif. Lindungi database SQLite dan backup-nya.
+Feed dan SQLite menyimpan nama tool, waktu, argumen, hasil, serta status error. Audit meredaksi kredensial koneksi yang diketahui, isi perubahan file sensitif, dan hasil `read_file` pada path sensitif. Isi perintah shell, perintah sesi proses, source code, input interaktif, isi Markdown, nilai penggantian DOCX, serta data sel/row tidak disimpan mentah di tabel audit; respons pembacaan dokumen dan output proses juga tidak dicatat mentah. Tabel approval dari versi terdahulu tetap berada dalam skema SQLite untuk kompatibilitas, tetapi tidak lagi digunakan untuk pemanggilan tool. Respons ke klien tetap berisi hasil tool yang sebenarnya. Shell arbitrer masih dapat mengeluarkan rahasia dengan bentuk yang tidak dikenali penyaring; jangan menganggap audit telah bebas dari seluruh informasi sensitif. Lindungi database SQLite dan backup-nya.
 
 ## Jaringan dan `web_fetch`
 

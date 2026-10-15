@@ -52,8 +52,14 @@ export function beginToolCall(db: Database, input: {
   const client = readClient(input.ctx);
   const secrets = redactSecrets(call?.request, call?.credential ?? "");
   const argumentsCopy = redactValue(input.args ?? {}, secrets) as Record<string, unknown>;
-  if (input.toolName === "shell" && typeof argumentsCopy.command === "string") {
-    argumentsCopy.command = `SHA-256: ${createHash("sha256").update(argumentsCopy.command).digest("hex")} (command omitted)`;
+  if (["shell", "start_process", "execute_code"].includes(input.toolName)) {
+    const field = input.toolName === "execute_code" ? "code" : "command";
+    if (typeof argumentsCopy[field] === "string") {
+      argumentsCopy[field] = `SHA-256: ${createHash("sha256").update(argumentsCopy[field]).digest("hex")} (${input.toolName === "shell" ? "command" : "source"} omitted)`;
+    }
+  }
+  for (const field of ["input", "markdown", "cells", "rows", "old_string", "new_string"]) {
+    if (field in argumentsCopy) argumentsCopy[field] = "[redacted]";
   }
   if ((input.toolName === "write_file" || input.toolName === "edit_file") &&
       typeof argumentsCopy.path === "string" && sensitivePath(argumentsCopy.path)) {

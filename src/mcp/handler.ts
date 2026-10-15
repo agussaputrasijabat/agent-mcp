@@ -1,4 +1,8 @@
 import { createMcpHandler, McpServer } from "@modelcontextprotocol/server";
+import { registerAppTool, registerAppResource, RESOURCE_MIME_TYPE } from "@modelcontextprotocol/ext-apps/server";
+import { resourceText } from "../resources.ts";
+import { previewFile, previewFileInput } from "../tools/file-preview.ts";
+import { openInFolder, openInFolderInput } from "../tools/open-folder.ts";
 import { sensitivePath } from "../security/sensitive-path.ts";
 import type { Database } from "bun:sqlite";
 import { beginToolCall, finishToolCall, type ToolMeta } from "../db/tool-calls.ts";
@@ -17,6 +21,12 @@ import {
   writeFile,
   writeFileInput,
 } from "../tools/files.ts";
+import { createDirectory, createDirectoryInput, listDirectory, listDirectoryInput, movePath, movePathInput, statPath, statPathInput } from "../tools/filesystem-extra.ts";
+import { ProcessSessions, startProcessInput, readProcessOutputInput, writeProcessInputInput, listProcessesInput, terminateProcessInput } from "../tools/process-sessions.ts";
+import { executeCode, executeCodeInput } from "../tools/code-execution.ts";
+import { readSpreadsheet, readSpreadsheetInput, createSpreadsheet, createSpreadsheetInput, editSpreadsheet, editSpreadsheetInput, searchSpreadsheet, searchSpreadsheetInput, analyzeDataInput, inspectTabular } from "../tools/spreadsheet.ts";
+import { readPdf, readPdfInput, createPdf, createPdfInput, editPdf, editPdfInput } from "../tools/pdf.ts";
+import { readDocx, readDocxInput, createDocx, createDocxInput, editDocx, editDocxInput, searchDocx, searchDocxInput } from "../tools/docx.ts";
 import {
   memoryForget,
   memoryForgetInput,
@@ -62,8 +72,9 @@ function traced<T>(db: Database, name: string, args: T, ctx: ToolMeta, run: () =
   const id = beginToolCall(db, { toolName: name, args, ctx });
   const started = Date.now();
   const candidate = args as Record<string, unknown>;
-  const omitResult = name === "shell" ||
-    (name === "read_file" && typeof candidate.path === "string" && sensitivePath(candidate.path));
+  const omitResult = ["shell", "start_process", "read_process_output", "write_process_input", "execute_code",
+    "read_spreadsheet", "search_spreadsheet", "analyze_data", "read_pdf", "read_docx", "search_docx", "preview_file"].includes(name)
+    || (typeof candidate.path === "string" && sensitivePath(candidate.path));
   return Promise.resolve()
     .then(run)
     .then((result) => {
@@ -85,6 +96,7 @@ export function createHostHandler(options: {
 }) {
   const gate = new ShellGate(options.shellConcurrency ?? (() => options.limits?.().shell_concurrency_limit ?? SHELL_CONCURRENCY));
   const db = options.db;
+  const processes = new ProcessSessions();
   const limits = options.limits ?? (() => readSettings(db));
   return createMcpHandler(() => {
     const serverInfo = {
@@ -142,6 +154,72 @@ export function createHostHandler(options: {
           }),
         ),
     );
+    server.registerTool("list_directory", { description: "List directory contents recursively with depth, offset, and limit. Does not follow symlinks.", inputSchema: listDirectoryInput, annotations: readOnly },
+      async (input, ctx) => traced(db, "list_directory", input, ctx, () => listDirectory(input)));
+    server.registerTool("create_directory", { description: "Create a directory, optionally including parent directories.", inputSchema: createDirectoryInput, annotations: upsertAnnotations },
+      async (input, ctx) => traced(db, "create_directory", input, ctx, () => createDirectory(input)));
+    server.registerTool("move_path", { description: "Move a file or folder. Refuses overwrite and symlink source.", inputSchema: movePathInput, annotations: writeAnnotations },
+      async (input, ctx) => traced(db, "move_path", input, ctx, () => movePath(input)));
+    server.registerTool("stat_path", { description: "Get file or directory metadata without following symlinks.", inputSchema: statPathInput, annotations: readOnly },
+      async (input, ctx) => traced(db, "stat_path", input, ctx, () => statPath(input)));
+
+    server.registerTool("start_process", { description: "Start a long-running host command with bounded output and a session ID. Client confirmation applies.", inputSchema: startProcessInput,
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true } },
+      async (input, ctx) => traced(db, "start_process", input, ctx, () => processes.start(input)));
+    server.registerTool("read_process_output", { description: "Read session output by character offset and length, with next_offset and status.", inputSchema: readProcessOutputInput, annotations: readOnly },
+      async (input, ctx) => traced(db, "read_process_output", input, ctx, () => processes.read(input)));
+    server.registerTool("write_process_input", { description: "Write input to a process session stdin.", inputSchema: writeProcessInputInput, annotations: writeAnnotations },
+      async (input, ctx) => traced(db, "write_process_input", input, ctx, () => processes.write(input)));
+    server.registerTool("list_processes", { description: "List process sessions owned by the current MCP identity.", inputSchema: listProcessesInput, annotations: readOnly },
+      async (input, ctx) => traced(db, "list_processes", input, ctx, () => processes.list()));
+    server.registerTool("terminate_process", { description: "Terminate a managed process session and its process group.", inputSchema: terminateProcessInput, annotations: deleteAnnotations },
+      async (input, ctx) => traced(db, "terminate_process", input, ctx, () => processes.terminate(input)));
+
+    server.registerTool("execute_code", { description: "Execute JavaScript, Python or R code without writing a source file. Requires the interpreter installed on host.", inputSchema: executeCodeInput,
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true } },
+      async (input, ctx) => traced(db, "execute_code", input, ctx, () => executeCode(input)));
+    server.registerTool("analyze_data", { description: "Summarize column stats for CSV, JSON array or XLSX/XLSM.", inputSchema: analyzeDataInput, annotations: readOnly },
+      async (input, ctx) => traced(db, "analyze_data", input, ctx, () => inspectTabular(input)));
+
+    server.registerTool("read_spreadsheet", { description: "Read sheet metadata and rows from XLSX or XLSM, with row and range limit.", inputSchema: readSpreadsheetInput, annotations: readOnly },
+      async (input, ctx) => traced(db, "read_spreadsheet", input, ctx, () => readSpreadsheet(input)));
+    server.registerTool("create_spreadsheet", { description: "Create a new XLSX workbook; refuses to overwrite.", inputSchema: createSpreadsheetInput, annotations: writeAnnotations },
+      async (input, ctx) => traced(db, "create_spreadsheet", input, ctx, () => createSpreadsheet(input)));
+    server.registerTool("edit_spreadsheet", { description: "Edit XLSX cell values. XLSM writes are refused to preserve macros.", inputSchema: editSpreadsheetInput, annotations: writeAnnotations },
+      async (input, ctx) => traced(db, "edit_spreadsheet", input, ctx, () => editSpreadsheet(input)));
+    server.registerTool("search_spreadsheet", { description: "Find matching cell values across spreadsheet sheets.", inputSchema: searchSpreadsheetInput, annotations: readOnly },
+      async (input, ctx) => traced(db, "search_spreadsheet", input, ctx, () => searchSpreadsheet(input)));
+
+    server.registerTool("read_pdf", { description: "Extract text from PDF pages.", inputSchema: readPdfInput, annotations: readOnly },
+      async (input, ctx) => traced(db, "read_pdf", input, ctx, () => readPdf(input)));
+    server.registerTool("create_pdf", { description: "Create a PDF from basic Latin-1 Markdown text.", inputSchema: createPdfInput, annotations: writeAnnotations },
+      async (input, ctx) => traced(db, "create_pdf", input, ctx, () => createPdf(input)));
+    server.registerTool("edit_pdf", { description: "Append a PDF, delete pages, or rotate pages in an existing PDF.", inputSchema: editPdfInput, annotations: writeAnnotations },
+      async (input, ctx) => traced(db, "edit_pdf", input, ctx, () => editPdf(input)));
+
+    server.registerTool("read_docx", { description: "Read DOCX paragraphs while preserving source package.", inputSchema: readDocxInput, annotations: readOnly },
+      async (input, ctx) => traced(db, "read_docx", input, ctx, () => readDocx(input)));
+    server.registerTool("create_docx", { description: "Create DOCX with paragraphs and Markdown headings.", inputSchema: createDocxInput, annotations: writeAnnotations },
+      async (input, ctx) => traced(db, "create_docx", input, ctx, () => createDocx(input)));
+    server.registerTool("edit_docx", { description: "Surgically edit a unique single text run in DOCX XML without rebuilding the document.", inputSchema: editDocxInput, annotations: writeAnnotations },
+      async (input, ctx) => traced(db, "edit_docx", input, ctx, () => editDocx(input)));
+    server.registerTool("search_docx", { description: "Find text within DOCX paragraphs.", inputSchema: searchDocxInput, annotations: readOnly },
+      async (input, ctx) => traced(db, "search_docx", input, ctx, () => searchDocx(input)));
+
+    const previewUri = "ui://agent-mcp/file-preview";
+    registerAppTool(server, "preview_file", {
+      description: "Preview Markdown, text, images, spreadsheets, PDF and DOCX. Render an interactive MCP Apps view on capable clients.",
+      inputSchema: previewFileInput,
+      annotations: readOnly,
+      _meta: { ui: { resourceUri: previewUri } },
+    }, async (input, ctx) => traced(db, "preview_file", input, ctx, () => previewFile(input)));
+    registerAppResource(server, previewUri, previewUri, { mimeType: RESOURCE_MIME_TYPE }, async () => ({
+      contents: [{ uri: previewUri, mimeType: RESOURCE_MIME_TYPE, text: resourceText("dist/web/mcp-preview.html") }],
+    }));
+    server.registerTool("open_in_folder", { description: "Request the host desktop file manager to open or reveal a path.", inputSchema: openInFolderInput,
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true } },
+      async (input, ctx) => traced(db, "open_in_folder", input, ctx, () => openInFolder(input)));
+
     server.registerTool(
       "web_fetch",
       {
