@@ -1,7 +1,7 @@
 name: "Usulan Fitur"
 description: "Ajukan fitur baru atau peningkatan kemampuan Agent MCP."
 title: "[Fitur]: "
-labels: ["enhancement"]
+labels: ["enhancement", "needs-triage"]
 body:
   - type: markdown
     attributes:

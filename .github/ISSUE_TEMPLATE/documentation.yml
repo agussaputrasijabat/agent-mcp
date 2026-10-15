@@ -1,7 +1,7 @@
 name: "Perbaikan Dokumentasi"
 description: "Laporkan panduan yang kurang jelas, salah, atau perlu ditambahkan."
 title: "[Dokumentasi]: "
-labels: ["documentation"]
+labels: ["documentation", "needs-triage"]
 body:
   - type: markdown
     attributes:

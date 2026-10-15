@@ -1,7 +1,7 @@
 name: "Laporan Bug"
 description: "Laporkan perilaku Agent MCP yang tidak berjalan sebagaimana mestinya."
 title: "[Bug]: "
-labels: ["bug"]
+labels: ["bug", "needs-triage"]
 body:
   - type: markdown
     attributes:

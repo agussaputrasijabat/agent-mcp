@@ -81,6 +81,6 @@ Untuk bug, tambahkan tes yang gagal sebelum perbaikan dan lulus setelahnya jika 
 - [ ] Dokumentasi dan tes diperbarui jika perilaku berubah.
 - [ ] Tidak ada API key, password, token, database, atau data pribadi dalam perubahan.
 
-Sertakan ringkasan perubahan, cara pengujian, dan screenshot hanya bila UI berubah. Maintainer dapat meminta perbaikan sebelum merge.
+Saat membuka PR, gunakan template yang tersedia di `.github/pull_request_template.md`. GitHub Actions menjalankan `bun test` dan `bun run build` pada setiap pull request ke `main`; pastikan keduanya lulus sebelum merge. Sertakan screenshot hanya bila UI berubah. Maintainer dapat meminta perbaikan sebelum merge.
 
 Proyek menggunakan [lisensi MIT](LICENSE). Dengan mengajukan kontribusi, kamu menyetujui distribusinya sesuai lisensi repository.
