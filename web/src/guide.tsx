@@ -5,6 +5,7 @@ import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle }
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { chatInstructions, fillProjectPrompt } from "./project-prompt.ts";
+import { SetupInstructionsGuide } from "./setup-guide.tsx";
 
 const chatSection = chatInstructions(projectInstructions);
 const projectStorageKey = "agent-mcp-setup-project-root";
@@ -206,42 +207,45 @@ export function SetupPage() {
 
   return (
     <div className="grid items-start gap-4 lg:grid-cols-[minmax(17rem,0.85fr)_minmax(0,1.15fr)]">
-      <Card>
-        <CardHeader>
-          <CardTitle><h2>Konfigurasi koneksi</h2></CardTitle>
-          <CardDescription>Path proyek dan nama konektor mengganti placeholder di instruksi. Endpoint mengikuti origin halaman ini.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <FieldGroup className="gap-3">
-            <Field>
-              <FieldLabel htmlFor="project-root">Path proyek</FieldLabel>
-              <Input
-                id="project-root"
-                value={projectRoot}
-                autoComplete="off"
-                spellCheck={false}
-                onChange={(event) => editRoot(event.target.value)}
-              />
-              <FieldDescription>Path absolut di mesin tempat MCP berjalan.</FieldDescription>
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="mcp-name">Nama MCP</FieldLabel>
-              <Input
-                id="mcp-name"
-                value={mcpName}
-                autoComplete="off"
-                spellCheck={false}
-                onChange={(event) => editName(event.target.value)}
-              />
-              <FieldDescription>Nama yang diketik saat menambah konektor di ChatGPT atau Claude.</FieldDescription>
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="mcp-endpoint">Endpoint</FieldLabel>
-              <Input id="mcp-endpoint" readOnly value={endpoint} spellCheck={false} />
-            </Field>
-          </FieldGroup>
-        </CardContent>
-      </Card>
+      <div className="flex min-w-0 flex-col gap-4">
+        <Card>
+          <CardHeader>
+            <CardTitle><h2>Konfigurasi koneksi</h2></CardTitle>
+            <CardDescription>Path proyek dan nama konektor mengganti placeholder di instruksi. Endpoint mengikuti origin halaman ini.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <FieldGroup className="gap-3">
+              <Field>
+                <FieldLabel htmlFor="project-root">Path proyek</FieldLabel>
+                <Input
+                  id="project-root"
+                  value={projectRoot}
+                  autoComplete="off"
+                  spellCheck={false}
+                  onChange={(event) => editRoot(event.target.value)}
+                />
+                <FieldDescription>Path absolut di mesin tempat MCP berjalan.</FieldDescription>
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="mcp-name">Nama MCP</FieldLabel>
+                <Input
+                  id="mcp-name"
+                  value={mcpName}
+                  autoComplete="off"
+                  spellCheck={false}
+                  onChange={(event) => editName(event.target.value)}
+                />
+                <FieldDescription>Nama yang diketik saat menambah konektor di ChatGPT atau Claude.</FieldDescription>
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="mcp-endpoint">Endpoint</FieldLabel>
+                <Input id="mcp-endpoint" readOnly value={endpoint} spellCheck={false} />
+              </Field>
+            </FieldGroup>
+          </CardContent>
+        </Card>
+        <SetupInstructionsGuide ready={ready} mcpName={name} />
+      </div>
       <Card>
         <CardHeader>
           <CardTitle><h2>Instruksi proyek</h2></CardTitle>
