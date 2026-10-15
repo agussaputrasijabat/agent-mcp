@@ -21,5 +21,5 @@ export function titleForPath(path: string): string {
     const name = decodeURIComponent(path.slice("/skills/".length));
     return name || "Skill";
   }
-  return "Agent MCP";
+  return "Halaman tidak ditemukan";
 }

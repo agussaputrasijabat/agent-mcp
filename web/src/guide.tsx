@@ -21,10 +21,10 @@ function stored(key: string): string {
 
 function Guide({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="flex max-w-3xl flex-col gap-4">
+    <div className="flex w-full min-w-0 flex-col gap-5">
       <Card>
         <CardHeader>
-          <CardTitle><h1>{title}</h1></CardTitle>
+          <CardTitle><h2>{title === "Dokumentasi" ? "Panduan penggunaan" : title}</h2></CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-4 text-sm leading-6">{children}</CardContent>
       </Card>
@@ -205,10 +205,10 @@ export function SetupPage() {
   }
 
   return (
-    <div className="grid items-start gap-4 lg:grid-cols-[minmax(16rem,24rem)_minmax(0,1fr)]">
+    <div className="grid items-start gap-4 lg:grid-cols-[minmax(17rem,0.85fr)_minmax(0,1.15fr)]">
       <Card>
         <CardHeader>
-          <CardTitle><h1>Setup</h1></CardTitle>
+          <CardTitle><h2>Konfigurasi koneksi</h2></CardTitle>
           <CardDescription>Path proyek dan nama konektor mengganti placeholder di instruksi. Endpoint mengikuti origin halaman ini.</CardDescription>
         </CardHeader>
         <CardContent>

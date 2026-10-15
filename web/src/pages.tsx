@@ -23,6 +23,8 @@ export function KeysPage() {
   const [failed, setFailed] = useState(false);
   const [name, setName] = useState("");
   const [secret, setSecret] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
   const [message, setMessage] = useState("");
 
   function load() {
@@ -51,11 +53,25 @@ export function KeysPage() {
       return;
     }
     setSecret(result.data.secret);
+    setCopied(false);
+    setCopyFailed(false);
     setName("");
     load();
   }
 
+  async function copySecret() {
+    if (!secret) return;
+    try {
+      await navigator.clipboard.writeText(secret);
+      setCopied(true);
+      setCopyFailed(false);
+    } catch {
+      setCopyFailed(true);
+    }
+  }
+
   async function revoke(id: string) {
+    if (!window.confirm("Cabut kunci API ini? Klien yang menggunakannya akan kehilangan akses.")) return;
     const result = await api<KeyRow>(`/api/api-keys/${id}/revoke`, { method: "POST", body: "{}" });
     if (!result.ok) {
       setMessage(result.message);
@@ -68,7 +84,7 @@ export function KeysPage() {
     <div className="flex flex-col gap-4">
       <Card>
         <CardHeader>
-          <CardTitle><h1>Kunci API</h1></CardTitle>
+          <CardTitle><h2>Buat kunci API</h2></CardTitle>
           <CardDescription>
             Endpoint MCP adalah alamat situs ini ditambah /mcp, yaitu <span className="font-mono break-all">{`${window.location.origin}/mcp`}</span>. Konektor tanpa kolom OAuth bisa menaruh kunci di query sebagai ?api_key=.
           </CardDescription>
@@ -77,10 +93,10 @@ export function KeysPage() {
           <form onSubmit={create}>
             <FieldGroup className="gap-3">
               <Field>
-                <FieldLabel htmlFor="key-name">Nama</FieldLabel>
+                <FieldLabel htmlFor="key-name">Nama kunci</FieldLabel>
                 <Input id="key-name" value={name} onChange={(event) => setName(event.target.value)} />
               </Field>
-              <Button className="w-fit" type="submit">Buat</Button>
+              <Button className="w-fit" type="submit" disabled={!name.trim()}>Buat kunci</Button>
             </FieldGroup>
           </form>
         </CardContent>
@@ -88,11 +104,16 @@ export function KeysPage() {
       {secret ? (
         <Alert>
           <AlertTitle className="font-mono break-all">{secret}</AlertTitle>
-          <AlertDescription>Salin kunci ini sekarang. Kunci tidak ditampilkan lagi.</AlertDescription>
+          <AlertDescription className="flex flex-wrap items-center gap-3">
+            <span>Salin kunci ini sekarang. Kunci tidak ditampilkan lagi.</span>
+            <Button type="button" variant="outline" size="sm" onClick={() => void copySecret()}>{copied ? "Tersalin" : "Salin kunci"}</Button>
+            {copyFailed ? <span className="text-destructive" role="status">Gagal menyalin. Pilih dan salin kunci secara manual.</span> : null}
+          </AlertDescription>
         </Alert>
       ) : null}
       {message ? <p className="text-destructive">{message}</p> : null}
       <Card>
+        <CardHeader><CardTitle>Daftar kunci</CardTitle><CardDescription>Cabut kunci yang tidak lagi digunakan.</CardDescription></CardHeader>
         <CardContent className="flex flex-col gap-3">
           {failed ? <Failed onRetry={load} /> : null}
           {rows === null && !failed ? <LoadingRows /> : null}
@@ -112,10 +133,10 @@ export function KeysPage() {
                   <TableRow key={row.id}>
                     <TableCell>{row.name}</TableCell>
                     <TableCell className="font-mono">{row.key_prefix}</TableCell>
-                    <TableCell>{row.revoked_at ? "dicabut" : ""}</TableCell>
+                    <TableCell><span className={row.revoked_at ? "text-muted-foreground" : "text-primary"}>{row.revoked_at ? "Dicabut" : "Aktif"}</span></TableCell>
                     <TableCell>
                       {row.revoked_at ? null : (
-                        <Button type="button" onClick={() => revoke(row.id)}>Cabut</Button>
+                        <Button type="button" variant="destructive" size="sm" onClick={() => void revoke(row.id)}>Cabut</Button>
                       )}
                     </TableCell>
                   </TableRow>
@@ -153,7 +174,7 @@ export function ClientsPage() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle><h1>Klien</h1></CardTitle>
+        <CardTitle><h2>Klien terhubung</h2></CardTitle>
       </CardHeader>
       <CardContent>
         {failed ? <Failed onRetry={load} /> : null}
@@ -173,14 +194,14 @@ export function ClientsPage() {
                 <TableRow key={row.id}>
                   <TableCell>{row.name}</TableCell>
                   <TableCell className="font-mono">{row.key_prefix}</TableCell>
-                  <TableCell>{row.last_used_at ?? "belum dipakai"}</TableCell>
+                  <TableCell className="text-muted-foreground">{row.last_used_at ?? "Belum dipakai"}</TableCell>
                 </TableRow>
               ))}
               {data.oauth.map((row) => (
                 <TableRow key={row.client_name}>
                   <TableCell>{row.client_name}</TableCell>
                   <TableCell>oauth</TableCell>
-                  <TableCell>{row.last_used_at}</TableCell>
+                  <TableCell className="text-muted-foreground">{row.last_used_at}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -206,6 +227,7 @@ export function SettingsPage() {
   const [failed, setFailed] = useState(false);
   const [message, setMessage] = useState("");
   const [notice, setNotice] = useState("");
+  const [saved, setSaved] = useState(false);
   const [autostart, setAutostart] = useState<AutostartState | null>(null);
   const [autostartPending, setAutostartPending] = useState(false);
   const [autostartMessage, setAutostartMessage] = useState("");
@@ -254,6 +276,7 @@ export function SettingsPage() {
     if (!form) return;
     setMessage("");
     setNotice("");
+    setSaved(false);
     const result = await api<Settings>("/api/settings", {
       method: "PATCH",
       body: JSON.stringify({
@@ -268,6 +291,7 @@ export function SettingsPage() {
       return;
     }
     setForm(result.data);
+    setSaved(true);
     if (result.data.public_base_url !== savedUrl) {
       setSavedUrl(result.data.public_base_url);
       setNotice("Klien OAuth yang sudah terhubung perlu disambungkan ulang.");
@@ -278,37 +302,41 @@ export function SettingsPage() {
     <div className="flex flex-col gap-4">
     <Card>
       <CardHeader>
-        <CardTitle><h1>Pengaturan</h1></CardTitle>
+        <CardTitle><h2>Konfigurasi server</h2></CardTitle>
+        <CardDescription>Atur alamat koneksi dan batas eksekusi shell.</CardDescription>
       </CardHeader>
       <CardContent>
         {failed ? <Failed onRetry={load} /> : null}
         {!form && !failed ? <LoadingRows /> : null}
         {form ? (
           <form onSubmit={save}>
-            <FieldGroup className="max-w-xl gap-3">
-              <Field>
+            <FieldGroup className="grid gap-4 md:grid-cols-3">
+              <Field className="md:col-span-3">
                 <FieldLabel htmlFor="public-url">URL publik</FieldLabel>
                 <Input id="public-url" value={form.public_base_url} onChange={(event) => setForm({ ...form, public_base_url: event.target.value })} />
               </Field>
               <Field>
                 <FieldLabel htmlFor="shell-limit">Batas shell</FieldLabel>
-                <Input id="shell-limit" type="number" value={form.shell_concurrency_limit} onChange={(event) => setForm({ ...form, shell_concurrency_limit: Number(event.target.value) })} />
+                <Input id="shell-limit" min={1} type="number" value={form.shell_concurrency_limit} onChange={(event) => setForm({ ...form, shell_concurrency_limit: Number(event.target.value) })} />
               </Field>
               <Field>
                 <FieldLabel htmlFor="shell-timeout">Timeout shell</FieldLabel>
-                <Input id="shell-timeout" type="number" value={form.shell_timeout_ms} onChange={(event) => setForm({ ...form, shell_timeout_ms: Number(event.target.value) })} />
+                <Input id="shell-timeout" min={1} type="number" value={form.shell_timeout_ms} onChange={(event) => setForm({ ...form, shell_timeout_ms: Number(event.target.value) })} />
               </Field>
               <Field>
                 <FieldLabel htmlFor="shell-timeout-max">Timeout maksimum</FieldLabel>
-                <Input id="shell-timeout-max" type="number" value={form.shell_timeout_max_ms} onChange={(event) => setForm({ ...form, shell_timeout_max_ms: Number(event.target.value) })} />
+                <Input id="shell-timeout-max" min={1} type="number" value={form.shell_timeout_max_ms} onChange={(event) => setForm({ ...form, shell_timeout_max_ms: Number(event.target.value) })} />
               </Field>
-              <Button className="w-fit" type="submit">Simpan</Button>
-              {message ? <p className="text-destructive">{message}</p> : null}
-              {notice ? (
-                <Alert>
-                  <AlertDescription>{notice}</AlertDescription>
-                </Alert>
-              ) : null}
+              <div className="flex flex-col items-start gap-3 md:col-span-3">
+                <Button type="submit">Simpan perubahan</Button>
+                {saved ? <p className="text-sm text-primary" role="status">Pengaturan berhasil disimpan.</p> : null}
+                {message ? <p className="text-destructive">{message}</p> : null}
+                {notice ? (
+                  <Alert>
+                    <AlertDescription>{notice}</AlertDescription>
+                  </Alert>
+                ) : null}
+              </div>
             </FieldGroup>
           </form>
         ) : null}
@@ -316,10 +344,10 @@ export function SettingsPage() {
     </Card>
     <Card>
       <CardHeader>
-        <CardTitle>Jalankan saat login</CardTitle>
+        <CardTitle><h2>Jalankan saat login</h2></CardTitle>
         <CardDescription>Agent MCP dapat berjalan otomatis saat kamu masuk ke komputer. Default nonaktif dan tidak membutuhkan hak administrator.</CardDescription>
       </CardHeader>
-      <CardContent className="flex max-w-xl flex-col gap-3">
+      <CardContent className="flex flex-col gap-3">
         {autostart ? (
           <div className="flex items-center justify-between gap-4">
             <div>
@@ -384,6 +412,7 @@ export function MemoriesPage() {
   }
 
   async function remove(memoryKey: string) {
+    if (!window.confirm("Hapus memori ini secara permanen?")) return;
     const result = await api<{ ok: boolean }>(`/api/memories/${encodeURIComponent(memoryKey)}`, { method: "DELETE" });
     if (!result.ok) {
       setMessage(result.message);
@@ -396,30 +425,34 @@ export function MemoriesPage() {
     <div className="flex flex-col gap-4">
       <Card>
         <CardHeader>
-          <CardTitle><h1>Memori</h1></CardTitle>
+          <CardTitle><h2>Simpan memori</h2></CardTitle>
+          <CardDescription>Catatan dapat dibaca kembali oleh agent di percakapan berikutnya.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={save}>
-            <FieldGroup className="max-w-xl gap-3">
+            <FieldGroup className="grid gap-4 md:grid-cols-2">
               <Field>
                 <FieldLabel htmlFor="memory-key">Key</FieldLabel>
                 <Input id="memory-key" value={key} onChange={(event) => setKey(event.target.value)} />
               </Field>
               <Field>
-                <FieldLabel htmlFor="memory-body">Isi</FieldLabel>
-                <Textarea id="memory-body" value={body} onChange={(event) => setBody(event.target.value)} />
-              </Field>
-              <Field>
                 <FieldLabel htmlFor="memory-path">Path proyek</FieldLabel>
                 <Input id="memory-path" value={projectPath} onChange={(event) => setProjectPath(event.target.value)} />
               </Field>
-              <Button className="w-fit" type="submit">Simpan</Button>
+              <Field className="md:col-span-2">
+                <FieldLabel htmlFor="memory-body">Isi</FieldLabel>
+                <Textarea id="memory-body" value={body} onChange={(event) => setBody(event.target.value)} />
+              </Field>
+              <div className="md:col-span-2">
+                <Button type="submit">Simpan</Button>
+              </div>
             </FieldGroup>
           </form>
         </CardContent>
       </Card>
       {message ? <p className="text-destructive">{message}</p> : null}
       <Card>
+        <CardHeader><CardTitle>Memori tersimpan</CardTitle></CardHeader>
         <CardContent className="flex flex-col gap-3">
           {failed ? <Failed onRetry={load} /> : null}
           {rows === null && !failed ? <LoadingRows /> : null}
@@ -441,7 +474,7 @@ export function MemoriesPage() {
                     <TableCell className="max-w-40 truncate text-muted-foreground">{row.project_path ?? ""}</TableCell>
                     <TableCell className="max-w-64 truncate text-muted-foreground">{row.body.slice(0, 120)}</TableCell>
                     <TableCell>
-                      <Button type="button" onClick={() => remove(row.key)}>Hapus</Button>
+                      <Button type="button" variant="destructive" size="sm" onClick={() => void remove(row.key)}>Hapus</Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -477,10 +510,11 @@ export function SkillsPage() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle><h1>Skill</h1></CardTitle>
+        <CardTitle><h2>Daftar skill</h2></CardTitle>
+        <CardDescription>Kelola prosedur yang dapat digunakan oleh agent.</CardDescription>
         <CardAction>
           <Button asChild>
-            <a href="/skills/new">Baru</a>
+            <a href="/skills/new">Tambah skill</a>
           </Button>
         </CardAction>
       </CardHeader>
@@ -557,7 +591,8 @@ export function SkillEditor({ name }: { name?: string }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle><h1>{name ? skill.name || name : "Skill baru"}</h1></CardTitle>
+        <CardTitle><h2>{name ? skill.name || name : "Skill baru"}</h2></CardTitle>
+        <CardDescription>Lengkapi nama, deskripsi, dan isi instruksi skill.</CardDescription>
       </CardHeader>
       <CardContent>
         {missing ? <p>Skill ini tidak ada.</p> : null}
@@ -565,7 +600,7 @@ export function SkillEditor({ name }: { name?: string }) {
         {loading ? <LoadingRows /> : null}
         {!missing && !failed && !loading ? (
           <form onSubmit={save}>
-            <FieldGroup className="max-w-3xl gap-3">
+            <FieldGroup className="grid gap-4 md:grid-cols-2">
               <Field>
                 <FieldLabel htmlFor="skill-name">Nama</FieldLabel>
                 <Input id="skill-name" value={skill.name} onChange={(event) => setSkill({ ...skill, name: event.target.value })} />
@@ -574,12 +609,14 @@ export function SkillEditor({ name }: { name?: string }) {
                 <FieldLabel htmlFor="skill-description">Deskripsi</FieldLabel>
                 <Input id="skill-description" value={skill.description} onChange={(event) => setSkill({ ...skill, description: event.target.value })} />
               </Field>
-              <Field>
+              <Field className="md:col-span-2">
                 <FieldLabel htmlFor="skill-body">Isi</FieldLabel>
                 <Textarea id="skill-body" className="min-h-64 font-mono" value={skill.body} onChange={(event) => setSkill({ ...skill, body: event.target.value })} />
               </Field>
-              <Button className="w-fit" type="submit">Simpan</Button>
-              {message ? <p className="text-destructive">{message}</p> : null}
+              <div className="flex flex-col items-start gap-3 md:col-span-2">
+                <Button type="submit">Simpan</Button>
+                {message ? <p className="text-destructive">{message}</p> : null}
+              </div>
             </FieldGroup>
           </form>
         ) : null}

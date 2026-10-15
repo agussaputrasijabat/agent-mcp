@@ -41,7 +41,7 @@ export function SessionsPage() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle><h1>Sesi</h1></CardTitle>
+        <CardTitle><h2>Daftar sesi</h2></CardTitle>
       </CardHeader>
       <CardContent>
         {failed ? <Failed onRetry={load} /> : null}
@@ -100,7 +100,7 @@ export function SessionDetailPage({ sessionKey }: { sessionKey: string }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle><h1 className="truncate" title={sessionKey}>{sessionKey}</h1></CardTitle>
+        <CardTitle><h2 className="truncate font-mono text-sm" title={sessionKey}>{sessionKey}</h2></CardTitle>
       </CardHeader>
       <CardContent>
         {failed ? <Failed onRetry={load} /> : null}
