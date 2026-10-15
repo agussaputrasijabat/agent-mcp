@@ -2,7 +2,7 @@ import type { Database } from "bun:sqlite";
 import * as z from "zod/v4";
 import { browseSkill, previousBrowseBody } from "./browse-skill.ts";
 import { loadEccSkills } from "./ecc-skills.ts";
-import { planSkill, previousPlanBody } from "./plan-skill.ts";
+import { olderPlanBody, planSkill, previousPlanBody } from "./plan-skill.ts";
 import { findRepoSkill, isProjectError, loadRepoSkills, resolveProjectPath } from "./repo-skills.ts";
 import { fail, ok, type ToolResult } from "./result.ts";
 import { isValidName } from "./names.ts";
@@ -32,12 +32,12 @@ type SkillRow = SkillListRow & { body: string };
 type BuiltInSkill = { name: string; description: string; body: string };
 
 export function seedBuiltInSkills(db: Database): void {
-  seedBuiltIn(db, planSkill, previousPlanBody);
+  seedBuiltIn(db, planSkill, [previousPlanBody, olderPlanBody]);
   seedBuiltIn(db, browseSkill, previousBrowseBody);
   for (const skill of loadEccSkills()) seedBuiltIn(db, skill, null);
 }
 
-function seedBuiltIn(db: Database, skill: BuiltInSkill, previousBody: string | null): void {
+function seedBuiltIn(db: Database, skill: BuiltInSkill, previousBody: string | readonly string[] | null): void {
   if (
     skill.description.length < 1 ||
     skill.description.length > SKILL_DESCRIPTION_LIMIT ||
@@ -57,12 +57,19 @@ function seedBuiltIn(db: Database, skill: BuiltInSkill, previousBody: string | n
        ON CONFLICT(name) DO NOTHING`,
     )
     .run(crypto.randomUUID(), skill.name, skill.description, skill.body, now, now);
-  if (inserted.changes === 1 || previousBody === null || previousBody === skill.body) return;
-  db.query(
-    `UPDATE skills
-     SET description = ?, body = ?, updated_at = ?
-     WHERE name = ? AND body = ?`,
-  ).run(skill.description, skill.body, now, skill.name, previousBody);
+  if (inserted.changes === 1 || previousBody === null) return;
+  const previousBodies = typeof previousBody === "string" ? [previousBody] : previousBody;
+  for (const previous of previousBodies) {
+    if (previous === skill.body) return;
+    const updated = db
+      .query(
+        `UPDATE skills
+         SET description = ?, body = ?, updated_at = ?
+         WHERE name = ? AND body = ?`,
+      )
+      .run(skill.description, skill.body, now, skill.name, previous);
+    if (updated.changes === 1) return;
+  }
 }
 
 export function skillList(db: Database, input: z.infer<typeof skillListInput> = {}): ToolResult {

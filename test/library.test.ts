@@ -5,7 +5,7 @@ import { afterEach, expect, test } from "bun:test";
 import { memoryForget, memorySave, memorySearch } from "../src/tools/memory.ts";
 import { browseSkill, previousBrowseBody } from "../src/tools/browse-skill.ts";
 import { eccSkillNames, loadEccSkills } from "../src/tools/ecc-skills.ts";
-import { planSkill, previousPlanBody } from "../src/tools/plan-skill.ts";
+import { olderPlanBody, planSkill, previousPlanBody } from "../src/tools/plan-skill.ts";
 import { skillDelete, skillList, skillRead, skillSave } from "../src/tools/skills.ts";
 import { openDatabase } from "../src/db/database.ts";
 
@@ -126,6 +126,18 @@ test("previous built-in plan upgrades and a custom body survives", () => {
   expect(upgraded.body).toContain("Revisi");
   expect(upgraded.body).toContain("Batal");
   expect(upgraded.body).not.toContain("Balas GO untuk mulai");
+
+  const oldest = openDatabase(path + "-old");
+  oldest
+    .query("UPDATE skills SET description = ?, body = ?, updated_at = ? WHERE name = ?")
+    .run("Pakai saat pengguna minta rencana sebelum kerja dimulai.", olderPlanBody, "2020-01-01T00:00:00.000Z", "plan");
+  oldest.close();
+  const upgradedOldest = openDatabase(path + "-old");
+  const oldestRow = upgradedOldest.query("SELECT body FROM skills WHERE name = ?").get("plan") as { body: string };
+  expect(olderPlanBody).toContain("Tulis rencana singkat di chat");
+  expect(olderPlanBody).not.toBe(previousPlanBody);
+  expect(oldestRow.body).toBe(planSkill.body);
+  upgradedOldest.close();
 
   const customBody = "Rencana kustom yang tidak boleh ditimpa.";
   expect(skillSave(second, { name: "plan", description: "Catatan lokal", body: customBody }).isError).toBeUndefined();
