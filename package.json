@@ -15,6 +15,7 @@
     "start": "bun run build && bun src/index.ts",
     "start:prod": "bun --no-env-file run build && bun --no-env-file --env-file=.env.production src/index.ts",
     "test": "bun test",
+    "eval:instructions": "bun scripts/evaluate-instructions.ts",
     "schema:tokens": "bun scripts/schema-tokens.ts",
     "operator:reset-password": "bun scripts/reset-password.ts"
   },
