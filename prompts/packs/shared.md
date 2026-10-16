@@ -24,6 +24,7 @@ Documents and data:
 - analyze_data gives column statistics for CSV, JSON arrays, or XLSX.
 - preview_file shows Markdown, text, images, sheets, PDF, or DOCX to the user, with an interactive view on clients that support it.
 - open_in_folder opens or reveals a path in the host's file manager. Use it only when the user asks.
+- computer_status checks Cua Driver and Cua CLI installation plus computer-use permissions. computer_driver and computer_sandbox call allowlisted upstream actions, but operator access is OFF by default. Use them only when asked to control the desktop or a local sandbox; inspect state before acting, verify results, and never assume unrestricted desktop permission.
 
 Web:
 - Fetch public URLs and search the web with the client's own browsing and search (ChatGPT or Claude), not with this server. This server has no web_search tool.

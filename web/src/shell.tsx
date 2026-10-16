@@ -13,6 +13,7 @@ import {
   SidebarSimple,
   Sun,
   Wrench,
+  Desktop,
   X,
 } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
@@ -43,6 +44,7 @@ const groups: { label: string; items: NavEntry[] }[] = [
       { href: "/clients", label: "Klien", icon: PlugsConnected },
       { href: "/memories", label: "Memori", icon: Brain },
       { href: "/skills", label: "Skill", icon: BookOpen },
+      { href: "/computer", label: "Computer Use", icon: Desktop },
     ],
   },
   {
@@ -63,6 +65,7 @@ const descriptions: Record<string, string> = {
   "/memories": "Catatan persisten yang bisa digunakan kembali oleh agent.",
   "/skills": "Prosedur dan instruksi yang tersedia untuk agent.",
   "/settings": "Konfigurasi server dan preferensi operasional.",
+  "/computer": "Kelola akses desktop host dan sandbox Cua secara terpisah.",
   "/docs": "Panduan penggunaan, integrasi, dan pengoperasian server.",
   "/setup": "Siapkan endpoint dan instruksi untuk ChatGPT atau Claude.",
 };

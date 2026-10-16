@@ -16,6 +16,7 @@ Server ini **bukan** CLI, IDE, atau model AI. ChatGPT atau Claude memilih tool; 
 - **Menyimpan konteks:** memori lintas percakapan dan skill yang bisa digunakan kembali. Skill dalam repository juga dapat dibaca tanpa disalin ke database.
 - **Memantau aktivitas:** dashboard untuk feed panggilan tool, riwayat sesi, klien, API key, memori, skill, dan pengaturan.
 - **Terhubung secara remote:** endpoint MCP Streamable HTTP dengan API key atau OAuth, untuk penggunaan lokal maupun server publik.
+- **Computer Use (opsional):** kendalikan window desktop melalui Cua Driver, atau kelola sandbox Linux lokal melalui Cua CLI. Kedua akses default-nya nonaktif. [Panduan Computer Use](docs/computer-use.md).
 
 ### Cara kerjanya
 

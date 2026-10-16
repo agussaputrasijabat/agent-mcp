@@ -1,4 +1,6 @@
 import { resourceBytes, resourceResponse } from "../resources.ts";
+import { computerSettings, updateComputerSettings } from "../computer/config.ts";
+import { CuaBridge, computerDiagnostics } from "../computer/bridge.ts";
 import { autostartStatus, enableAutostart, disableAutostart, isStandaloneBinary } from "../cli/autostart.ts";
 import type { Database } from "bun:sqlite";
 import type { Context, Hono } from "hono";
@@ -15,7 +17,7 @@ const monthMs = 30 * 24 * hourMs;
 
 type OperatorCheck = (c: Context) => Promise<unknown>;
 
-export function registerDashboard(app: Hono, db: Database, operator: OperatorCheck) {
+export function registerDashboard(app: Hono, db: Database, operator: OperatorCheck, computerBridge?: CuaBridge) {
   app.get("/fonts/Geist-Variable.woff2", () => {
     return resourceResponse("node_modules/geist/dist/fonts/geist-sans/Geist-Variable.woff2", "font/woff2");
   });
@@ -84,6 +86,31 @@ export function registerDashboard(app: Hono, db: Database, operator: OperatorChe
       return ok(c, state);
     } catch (error) {
       return fail(c, 500, "autostart_failed", error instanceof Error ? error.message : "Autostart failed");
+    }
+  });
+
+  app.get("/api/computer", async (c) => {
+    if (!(await operator(c))) return fail(c, 401, "unauthorized", "Sign in required");
+    return ok(c, { settings: computerSettings(db), runtimes: computerDiagnostics() });
+  });
+
+  app.patch("/api/computer", async (c) => {
+    if (!(await operator(c))) return fail(c, 401, "unauthorized", "Sign in required");
+    if (c.req.header("x-agent-mcp-action") !== "computer-settings" ||
+        !c.req.header("content-type")?.startsWith("application/json")) {
+      return fail(c, 403, "action_header_required", "Computer settings require an explicit same-site JSON action");
+    }
+    const body = await c.req.json().catch(() => null);
+    try {
+      const before = computerSettings(db);
+      const after = updateComputerSettings(db, body);
+      if ((before.driver_observe && !after.driver_observe) || (before.driver_control && !after.driver_control) ||
+          (before.sandbox_observe && !after.sandbox_observe) || (before.sandbox_manage && !after.sandbox_manage)) {
+        await computerBridge?.closeAll();
+      }
+      return ok(c, { settings: after, runtimes: computerDiagnostics() });
+    } catch (error) {
+      return fail(c, 400, "validation_error", error instanceof Error ? error.message : "Invalid computer settings");
     }
   });
 
@@ -180,7 +207,7 @@ export function registerDashboard(app: Hono, db: Database, operator: OperatorChe
     return dashboardPage();
   };
 
-  for (const path of ["/keys", "/clients", "/settings", "/memories", "/skills", "/skills/new", "/docs", "/setup"]) {
+  for (const path of ["/keys", "/clients", "/settings", "/computer", "/memories", "/skills", "/skills/new", "/docs", "/setup"]) {
     app.get(path, page);
   }
   app.get("/tutorial", (c) => c.redirect("/docs"));

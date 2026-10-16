@@ -1,6 +1,8 @@
 import { createMcpHandler, McpServer } from "@modelcontextprotocol/server";
 import { registerAppTool, registerAppResource, RESOURCE_MIME_TYPE } from "@modelcontextprotocol/ext-apps/server";
 import { resourceText } from "../resources.ts";
+import { CuaBridge } from "../computer/bridge.ts";
+import { computerStatus, computerDriver, computerDriverInput, computerSandbox, computerSandboxInput } from "../computer/tools.ts";
 import { previewFile, previewFileInput } from "../tools/file-preview.ts";
 import { openInFolder, openInFolderInput } from "../tools/open-folder.ts";
 import { sensitivePath } from "../security/sensitive-path.ts";
@@ -74,7 +76,7 @@ function traced<T>(db: Database, name: string, args: T, ctx: ToolMeta, run: () =
   const started = Date.now();
   const candidate = args as Record<string, unknown>;
   const omitResult = ["shell", "start_process", "read_process_output", "write_process_input", "execute_code",
-    "read_spreadsheet", "search_spreadsheet", "analyze_data", "read_pdf", "read_docx", "search_docx", "preview_file"].includes(name)
+    "read_spreadsheet", "search_spreadsheet", "analyze_data", "read_pdf", "read_docx", "search_docx", "preview_file", "computer_driver", "computer_sandbox"].includes(name)
     || (typeof candidate.path === "string" && sensitivePath(candidate.path));
   return Promise.resolve()
     .then(run)
@@ -94,10 +96,12 @@ export function createHostHandler(options: {
   instructions: string;
   shellConcurrency?: number;
   limits?: () => Pick<Settings, "shell_timeout_ms" | "shell_timeout_max_ms" | "shell_concurrency_limit">;
+  computerBridge?: CuaBridge;
 }) {
   const gate = new ShellGate(options.shellConcurrency ?? (() => options.limits?.().shell_concurrency_limit ?? SHELL_CONCURRENCY));
   const db = options.db;
   const processes = new ProcessSessions();
+  const computer = options.computerBridge ?? new CuaBridge();
   const limits = options.limits ?? (() => readSettings(db));
   return createMcpHandler(() => {
     const serverInfo = {
@@ -297,6 +301,21 @@ export function createHostHandler(options: {
       },
       async (input, ctx) => traced(db, "skill_delete", input, ctx, () => skillDelete(db, input)),
     );
+    server.registerTool("computer_status", {
+      description: "Check Cua Driver and Cua sandbox binary installation and operator permissions. No desktop access.",
+      inputSchema: {},
+      annotations: readOnly,
+    }, (_input, ctx) => traced(db, "computer_status", {}, ctx, () => computerStatus(db)));
+    server.registerTool("computer_driver", {
+      description: "Use Cua Driver with an approved bounded app manifest. Launch an allowed bundle_id/path with launch_app; list_windows requires pid; get_window_state requires pid and window_id. Input actions target an exact window. Desktop-wide input is unavailable.",
+      inputSchema: computerDriverInput,
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
+    }, (input, ctx) => traced(db, "computer_driver", input, ctx, () => computerDriver(db, computer, input)));
+    server.registerTool("computer_sandbox", {
+      description: "Inspect or manage local Cua Linux sandboxes via Cua CLI MCP. Actions: images_list, sandbox_list, sandbox_get, sandbox_create, sandbox_start, sandbox_stop, sandbox_delete, computer_screenshot, computer_click, computer_type, computer_key, computer_scroll. Requires operator opt-in. Explicit local:name for existing sandboxes. No cloud or shell.",
+      inputSchema: computerSandboxInput,
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
+    }, (input, ctx) => traced(db, "computer_sandbox", input, ctx, () => computerSandbox(db, computer, input)));
     return server;
   });
 }

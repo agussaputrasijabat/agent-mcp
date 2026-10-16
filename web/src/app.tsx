@@ -3,6 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { FeedPage } from "./feed.tsx";
 import { DocsPage, SetupPage } from "./guide.tsx";
 import { LoginPage } from "./login.tsx";
+import { ComputerPage } from "./computer.tsx";
 import { ClientsPage, KeysPage, MemoriesPage, SettingsPage, SkillEditor, SkillsPage } from "./pages.tsx";
 import { SessionDetailPage, SessionsPage } from "./sessions.tsx";
 import { Shell } from "./shell.tsx";
@@ -20,6 +21,7 @@ export function App() {
   if (path === "/keys") return <Shell><KeysPage /></Shell>;
   if (path === "/clients") return <Shell><ClientsPage /></Shell>;
   if (path === "/settings") return <Shell><SettingsPage /></Shell>;
+  if (path === "/computer") return <Shell><ComputerPage /></Shell>;
   if (path === "/memories") return <Shell><MemoriesPage /></Shell>;
   if (path === "/skills") return <Shell><SkillsPage /></Shell>;
   if (path === "/skills/new") return <Shell><SkillEditor /></Shell>;

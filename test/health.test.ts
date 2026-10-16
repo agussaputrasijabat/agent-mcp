@@ -43,7 +43,7 @@ test("migrations apply twice and enable WAL with normal sync", () => {
 
   expect(mode.journal_mode).toBe("wal");
   expect(sync.synchronous).toBe(1);
-  expect(migrations.count).toBe(7);
+  expect(migrations.count).toBe(8);
   const columns = second.query("PRAGMA table_info(settings)").all() as { name: string; dflt_value: string | null }[];
   expect(columns.find((column) => column.name === "shell_policy")?.dflt_value).toBe("'strict'");
   second.close();
@@ -69,7 +69,7 @@ test("existing migrations retain legacy IDs after reopening", () => {
   const first = openDatabase(databasePath);
   first.exec("UPDATE schema_migrations SET id = substr(id, 12) WHERE id LIKE 'migrations/%'");
   const before = first.query("SELECT id FROM schema_migrations ORDER BY id").all() as { id: string }[];
-  expect(before).toHaveLength(7);
+  expect(before).toHaveLength(8);
   expect(before.every(({ id }) => !id.includes("/"))).toBe(true);
   first.close();
 

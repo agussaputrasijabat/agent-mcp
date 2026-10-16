@@ -52,6 +52,10 @@ export function beginToolCall(db: Database, input: {
   const client = readClient(input.ctx);
   const secrets = redactSecrets(call?.request, call?.credential ?? "");
   const argumentsCopy = redactValue(input.args ?? {}, secrets) as Record<string, unknown>;
+  if (input.toolName === "computer_driver" || input.toolName === "computer_sandbox") {
+    // Computer observations, typed text, screenshots and sandbox arguments can contain private data.
+    argumentsCopy.parameters = "[redacted]";
+  }
   if (["shell", "start_process", "execute_code"].includes(input.toolName)) {
     const field = input.toolName === "execute_code" ? "code" : "command";
     if (typeof argumentsCopy[field] === "string") {

@@ -13,6 +13,8 @@ import { fail, ok } from "./http/json.ts";
 import { decodeCursor, getToolCall, listSessions, listToolCalls } from "./db/tool-calls.ts";
 import { dashboardPage, registerDashboard } from "./http/dashboard.ts";
 import { createHostHandler } from "./mcp/handler.ts";
+import { CuaBridge } from "./computer/bridge.ts";
+import { startSandboxCleanup } from "./computer/tools.ts";
 import { runMcpRequest } from "./mcp/request-context.ts";
 import { assertInstructions, etagMatches, instructionModes, isInstructionMode, readInstructionPack, readServerInstructions } from "./mcp/instructions.ts";
 
@@ -64,7 +66,10 @@ export async function createApp(db: Database, options: AppOptions = {}) {
 
   const instructions = assertInstructions(options.instructions ?? readServerInstructions());
   for (const mode of instructionModes) readInstructionPack(mode);
+  const computerBridge = new CuaBridge();
+  startSandboxCleanup(db, computerBridge);
   const handler = createHostHandler({
+    computerBridge,
     db,
     instructions,
     shellConcurrency: options.shellConcurrency,
@@ -229,7 +234,7 @@ export async function createApp(db: Database, options: AppOptions = {}) {
     );
   });
 
-  registerDashboard(app, db, operator);
+  registerDashboard(app, db, operator, computerBridge);
 
   return Object.assign(app, { auth });
 }
