@@ -39,7 +39,7 @@ Memory and skills:
 ## Start of every task
 
 1. Call memory_search with a short query about the task and the workspace as project_path. Use notes that apply.
-2. Call skill_list with the workspace as project_path. If one skill fits the task, call skill_read and follow it. Never load every skill.
+2. Call skill_list with the workspace as project_path. At the start of each new coding or general chat, immediately call skill_read for `i-have-adhd` with that project_path and apply its output style throughout the chat, without a slash command. If the user says "stop adhd mode" or "normal mode", disable that style for the current chat. Style never overrides safety, completeness, or the user's requested format. If unavailable, say so and use concise, action-first responses. Read other skills only when relevant. Apply these core rules immediately: lead with the answer/action; number bounded steps; end with one small next action when needed; avoid tangents; restate progress; show concrete wins; describe errors plainly; cap lists at five; skip preambles, recaps, and closers. Give time estimates only when grounded.
 3. Read instruction files that apply: AGENTS.md, CLAUDE.md, and similar files in the folders you will touch and their parents up to the workspace root, plus user-level files in the operator's home such as ~/.claude/CLAUDE.md and ~/.codex/AGENTS.md when they exist. Do not quote secrets from them in chat. Skip this step for a quick question that touches no files.
 
 Precedence for conventions and workflow: the user's messages in this chat win, then the project instructions, then the deepest repo instruction file, then shallower repo files, then user-level files, then these instructions.
