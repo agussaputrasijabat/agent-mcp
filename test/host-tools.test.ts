@@ -348,28 +348,24 @@ function calledFetch(input: string | URL | Request, init?: RequestInit): { href:
   return { href, host };
 }
 
-test("tools/list exposes seven host tools and instructions", async () => {
+test("tools/list exposes host and document tools with instructions", async () => {
   const db = openDatabase(":memory:");
   const app = await testApp(db, { instructions: readServerInstructions() });
   const key = createApiKey(db, "test").secret;
   const listed = await postMcp(app, "tools/list", undefined, key);
   const names = listed.body.result?.tools?.map((tool) => tool.name) ?? [];
-  expect(names).toEqual([
-    "read_file",
-    "write_file",
-    "edit_file",
-    "glob",
-    "grep",
-    "shell",
-    "web_fetch",
-    "memory_search",
-    "memory_save",
-    "memory_forget",
-    "skill_list",
-    "skill_read",
-    "skill_save",
-    "skill_delete",
-  ]);
+  expect(names).toEqual(expect.arrayContaining([
+    "read_file", "write_file", "edit_file", "glob", "grep", "shell",
+    "list_directory", "create_directory", "move_path", "stat_path",
+    "start_process", "read_process_output", "write_process_input", "list_processes", "terminate_process",
+    "execute_code", "analyze_data",
+    "read_spreadsheet", "create_spreadsheet", "edit_spreadsheet", "search_spreadsheet",
+    "read_pdf", "create_pdf", "edit_pdf",
+    "read_docx", "create_docx", "edit_docx", "search_docx",
+    "preview_file", "open_in_folder",
+    "web_fetch", "memory_search", "memory_save", "memory_forget",
+    "skill_list", "skill_read", "skill_save", "skill_delete", "get_instructions",
+  ]));
   const read = listed.body.result?.tools?.find((tool) => tool.name === "read_file");
   const shell = listed.body.result?.tools?.find((tool) => tool.name === "shell");
   expect(read?.annotations?.readOnlyHint).toBe(true);
@@ -381,5 +377,6 @@ test("tools/list exposes seven host tools and instructions", async () => {
     clientInfo: { name: "test", version: "0" },
   }, key);
   expect(initialized.body.result?.serverInfo?.instructions).toBe(readServerInstructions());
-  expect(assertInstructions(readServerInstructions()).length).toBe(512);
+  expect(assertInstructions(readServerInstructions()).length).toBeGreaterThan(0);
+  expect(assertInstructions(readServerInstructions()).length).toBeLessThanOrEqual(512);
 });

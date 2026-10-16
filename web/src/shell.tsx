@@ -13,6 +13,7 @@ import {
   SidebarSimple,
   Sun,
   Wrench,
+  Desktop,
   X,
 } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
@@ -43,6 +44,7 @@ const groups: { label: string; items: NavEntry[] }[] = [
       { href: "/clients", label: "Klien", icon: PlugsConnected },
       { href: "/memories", label: "Memori", icon: Brain },
       { href: "/skills", label: "Skill", icon: BookOpen },
+      { href: "/computer", label: "Computer Use", icon: Desktop },
     ],
   },
   {
@@ -63,6 +65,7 @@ const descriptions: Record<string, string> = {
   "/memories": "Catatan persisten yang bisa digunakan kembali oleh agent.",
   "/skills": "Prosedur dan instruksi yang tersedia untuk agent.",
   "/settings": "Konfigurasi server dan preferensi operasional.",
+  "/computer": "Kelola akses desktop host dan sandbox Cua secara terpisah.",
   "/docs": "Panduan penggunaan, integrasi, dan pengoperasian server.",
   "/setup": "Siapkan endpoint dan instruksi untuk ChatGPT atau Claude.",
 };
@@ -346,4 +349,14 @@ export function formatWhen(value: string | null): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return new Intl.DateTimeFormat("id-ID", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(date);
+}
+
+export function formatDuration(ms: number | null | undefined): string {
+  if (ms === null || ms === undefined || !Number.isFinite(ms) || ms < 0) return "—";
+  if (ms < 1000) return `${Math.round(ms)} ms`;
+  if (ms < 59_950) return `${(ms / 1000).toLocaleString("id-ID", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} dtk`;
+  const total = Math.round(ms / 1000);
+  const minutes = Math.floor(total / 60);
+  const seconds = total % 60;
+  return seconds === 0 ? `${minutes} mnt` : `${minutes} mnt ${seconds} dtk`;
 }

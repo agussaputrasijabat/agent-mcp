@@ -1,4 +1,6 @@
 import { resourceBytes, resourceResponse } from "../resources.ts";
+import { computerSettings, updateComputerSettings } from "../computer/config.ts";
+import { CuaBridge, computerDiagnostics } from "../computer/bridge.ts";
 import { autostartStatus, enableAutostart, disableAutostart, isStandaloneBinary } from "../cli/autostart.ts";
 import type { Database } from "bun:sqlite";
 import type { Context, Hono } from "hono";
@@ -15,7 +17,7 @@ const monthMs = 30 * 24 * hourMs;
 
 type OperatorCheck = (c: Context) => Promise<unknown>;
 
-export function registerDashboard(app: Hono, db: Database, operator: OperatorCheck) {
+export function registerDashboard(app: Hono, db: Database, operator: OperatorCheck, computerBridge?: CuaBridge) {
   app.get("/fonts/Geist-Variable.woff2", () => {
     return resourceResponse("node_modules/geist/dist/fonts/geist-sans/Geist-Variable.woff2", "font/woff2");
   });
@@ -87,6 +89,31 @@ export function registerDashboard(app: Hono, db: Database, operator: OperatorChe
     }
   });
 
+  app.get("/api/computer", async (c) => {
+    if (!(await operator(c))) return fail(c, 401, "unauthorized", "Sign in required");
+    return ok(c, { settings: computerSettings(db), runtimes: computerDiagnostics() });
+  });
+
+  app.patch("/api/computer", async (c) => {
+    if (!(await operator(c))) return fail(c, 401, "unauthorized", "Sign in required");
+    if (c.req.header("x-agent-mcp-action") !== "computer-settings" ||
+        !c.req.header("content-type")?.startsWith("application/json")) {
+      return fail(c, 403, "action_header_required", "Computer settings require an explicit same-site JSON action");
+    }
+    const body = await c.req.json().catch(() => null);
+    try {
+      const before = computerSettings(db);
+      const after = updateComputerSettings(db, body);
+      if ((before.driver_observe && !after.driver_observe) || (before.driver_control && !after.driver_control) ||
+          (before.sandbox_observe && !after.sandbox_observe) || (before.sandbox_manage && !after.sandbox_manage)) {
+        await computerBridge?.closeAll();
+      }
+      return ok(c, { settings: after, runtimes: computerDiagnostics() });
+    } catch (error) {
+      return fail(c, 400, "validation_error", error instanceof Error ? error.message : "Invalid computer settings");
+    }
+  });
+
   app.get("/api/settings", async (c) => {
     if (!(await operator(c))) return fail(c, 401, "unauthorized", "Sign in required");
     return ok(c, readSettings(db));
@@ -107,13 +134,13 @@ export function registerDashboard(app: Hono, db: Database, operator: OperatorChe
   app.get("/api/memories", async (c) => {
     if (!(await operator(c))) return fail(c, 401, "unauthorized", "Sign in required");
     const q = c.req.query("q");
-    const items = q
-      ? db.query(
-          `SELECT key, body, project_path, updated_at FROM memories
-           WHERE key LIKE ? ESCAPE '\\' OR body LIKE ? ESCAPE '\\'
-           ORDER BY updated_at DESC`,
-        ).all(likeContains(q), likeContains(q))
-      : db.query("SELECT key, body, project_path, updated_at FROM memories ORDER BY updated_at DESC").all();
+    const statement = `SELECT key, body, project_path, updated_at FROM (
+      SELECT key, body, project_path, updated_at FROM memories
+      UNION ALL
+      SELECT key, body, NULLIF(project_path, '') AS project_path, updated_at FROM project_memories
+    ) ${q ? "WHERE key LIKE ? ESCAPE '\\' OR body LIKE ? ESCAPE '\\'" : ""}
+    ORDER BY updated_at DESC`;
+    const items = q ? db.query(statement).all(likeContains(q), likeContains(q)) : db.query(statement).all();
     return ok(c, { items });
   });
 
@@ -127,13 +154,13 @@ export function registerDashboard(app: Hono, db: Database, operator: OperatorChe
     const result = memorySave(db, { key: body.key, body: body.body, project_path: project });
     const error = toolError(result);
     if (error) return fail(c, error.code === "not_found" ? 404 : 400, error.code, error.message);
-    const row = db.query("SELECT key, body, project_path, updated_at FROM memories WHERE key = ?").get(body.key);
-    return ok(c, row);
+    return ok(c, { key: body.key, body: body.body, project_path: project ?? null, updated_at: new Date().toISOString() });
   });
 
   app.delete("/api/memories/:key", async (c) => {
     if (!(await operator(c))) return fail(c, 401, "unauthorized", "Sign in required");
-    const result = memoryForget(db, { key: c.req.param("key") });
+    const project = c.req.query("project_path");
+    const result = memoryForget(db, { key: c.req.param("key"), project_path: project || undefined });
     const error = toolError(result);
     if (error) return fail(c, error.code === "not_found" ? 404 : 400, error.code, error.message);
     return ok(c, { ok: true });
@@ -180,7 +207,7 @@ export function registerDashboard(app: Hono, db: Database, operator: OperatorChe
     return dashboardPage();
   };
 
-  for (const path of ["/keys", "/clients", "/settings", "/memories", "/skills", "/skills/new", "/docs", "/setup"]) {
+  for (const path of ["/keys", "/clients", "/settings", "/computer", "/memories", "/skills", "/skills/new", "/docs", "/setup"]) {
     app.get(path, page);
   }
   app.get("/tutorial", (c) => c.redirect("/docs"));

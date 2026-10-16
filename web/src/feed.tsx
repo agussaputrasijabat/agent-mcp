@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { ArrowClockwise, MagnifyingGlass, Pulse } from "@phosphor-icons/react";
 import { api } from "./api.ts";
-import { EmptyState, LoadingRows, Shell, formatWhen } from "./shell.tsx";
+import { EmptyState, LoadingRows, Shell, formatDuration, formatWhen } from "./shell.tsx";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,6 +13,7 @@ type CallRow = {
   tool_name: string;
   started_at: string;
   session_key: string;
+  duration_ms: number | null;
   is_error: number;
 };
 
@@ -140,13 +141,14 @@ function FeedBody() {
           {rows && visible.length > 0 && !failed ? (
             <Table>
               <TableHeader>
-                <TableRow><TableHead>Tool</TableHead><TableHead>Waktu</TableHead><TableHead>Sesi</TableHead><TableHead>Status</TableHead></TableRow>
+                <TableRow><TableHead>Tool</TableHead><TableHead>Waktu</TableHead><TableHead>Durasi</TableHead><TableHead>Sesi</TableHead><TableHead>Status</TableHead></TableRow>
               </TableHeader>
               <TableBody>
                 {visible.map((row) => (
                   <TableRow key={row.id}>
                     <TableCell className="font-medium">{row.tool_name}</TableCell>
                     <TableCell className="text-muted-foreground">{formatWhen(row.started_at)}</TableCell>
+                    <TableCell className="text-muted-foreground tabular-nums">{formatDuration(row.duration_ms)}</TableCell>
                     <TableCell className="max-w-48 truncate">
                       <a className="font-mono text-xs text-foreground hover:text-primary hover:underline" href={"/sessions/" + encodeURIComponent(row.session_key)}>{row.session_key}</a>
                     </TableCell>

@@ -13,11 +13,13 @@
 
 Ini **bukan** isolasi sistem operasi. `read_file`, `write_file`, `edit_file`, dan `shell` dijalankan dengan izin user yang menjalankan proses Bun. `project_path` hanya memberi konteks kepada klien dan tidak membatasi jangkauan tool.
 
-## Approval tidak ditegakkan server
+## Konfirmasi tool oleh ChatGPT / Claude
 
-Template instruksi proyek meminta klien chat meminta izin sebelum operasi berbahaya, seperti penghapusan data atau perintah Git tertentu. **Server tidak memeriksa bukti persetujuan itu.** Setelah panggilan MCP lolos autentikasi, tool akan menjalankan aksi sesuai implementasinya.
+Agent MCP mengirim anotasi MCP `readOnlyHint`, `destructiveHint`, dan `openWorldHint`. Konfirmasi dilakukan oleh **aplikasi klien** (ChatGPT atau Claude) sebelum tool dipanggil, sesuai pengaturan izin dan kebijakan klien. Server tidak meminta `approval_id`, tidak menyediakan persetujuan terpisah, dan tidak memaksa operator membuka dashboard.
 
-Jangan menganggap prompt sebagai pengganti pembatasan akses OS, firewall, atau perlindungan kredensial.
+Tool `shell`, `start_process`, `execute_code`, `write_file`, `edit_file`, `move_path`, operasi penulisan dokumen, `terminate_process`, `memory_forget`, dan `skill_delete` ditandai berpotensi destruktif. Penulisan memori/skill juga ditandai sebagai operasi perubahan data; operasi baca memiliki `readOnlyHint: true`.
+
+**Batas keamanan:** Anotasi MCP adalah petunjuk, bukan mekanisme otorisasi. Tidak semua klien atau konfigurasi akan memunculkan dialog; izin yang disimpan/diingat oleh klien juga bisa meniadakan dialog berikutnya. Jika klien mengirim pemanggilan tool yang sudah diizinkan oleh autentikasi MCP, server menjalankannya dengan hak akses OS proses. Periksa izin tool klien dan gunakan akun OS dengan hak minimum. Konfirmasi klien bukan sandbox.
 
 ## Rekomendasi deployment
 
@@ -32,11 +34,11 @@ Jangan menganggap prompt sebagai pengganti pembatasan akses OS, firewall, atau p
 
 ## Audit dan rahasia
 
-Feed dan SQLite menyimpan nama tool, waktu, argumen, hasil, serta status error. Peredaksian berupaya menyembunyikan API key request dan nama parameter tertentu. Namun, perintah shell dan output tool masih bisa memuat rahasia lain (misalnya isi berkas konfigurasi). Anggap database audit sebagai data sensitif.
+Feed dan SQLite menyimpan nama tool, waktu, argumen, hasil, serta status error. Audit meredaksi kredensial koneksi yang diketahui, isi perubahan file sensitif, dan hasil `read_file` pada path sensitif. Isi perintah shell, perintah sesi proses, source code, input interaktif, isi Markdown, nilai penggantian DOCX, serta data sel/row tidak disimpan mentah di tabel audit; respons pembacaan dokumen dan output proses juga tidak dicatat mentah. Tabel approval dari versi terdahulu tetap berada dalam skema SQLite untuk kompatibilitas, tetapi tidak lagi digunakan untuk pemanggilan tool. Respons ke klien tetap berisi hasil tool yang sebenarnya. Shell arbitrer masih dapat mengeluarkan rahasia dengan bentuk yang tidak dikenali penyaring; jangan menganggap audit telah bebas dari seluruh informasi sensitif. Lindungi database SQLite dan backup-nya.
 
 ## Jaringan dan `web_fetch`
 
-`web_fetch` berjalan di host, bukan dari browser operator. Implementasi saat ini memblokir alamat privat, loopback, dan bentuk alamat tertentu yang tidak aman. Karena itu, instruksi yang menyarankan `web_fetch` untuk localhost/LAN belum sesuai dengan perilaku tool sekarang. Jangan membuka akses jaringan privat hanya untuk mengatasi pesan `fetch_blocked` tanpa meninjau risiko SSRF.
+`web_fetch` berjalan di host, bukan dari browser operator. Implementasi saat ini memblokir alamat privat, loopback, dan bentuk alamat tertentu yang tidak aman. Instruksi dari `get_instructions` mengarahkan URL localhost/LAN ke `shell` dengan curl. Jangan membuka akses jaringan privat hanya untuk mengatasi pesan `fetch_blocked` tanpa meninjau risiko SSRF.
 
 ## Laporan kerentanan
 

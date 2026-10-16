@@ -1,4 +1,5 @@
-import { closeSync, mkdirSync, openSync, readFileSync, readSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { closeSync, fchmodSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, readSync, readdirSync, renameSync, rmdirSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import { createHash, randomUUID } from "node:crypto";
 import { dirname, join, relative, sep } from "node:path";
 import type { Dirent } from "node:fs";
 import * as z from "zod/v4";
@@ -15,22 +16,28 @@ import { imageMime, readImageFile } from "./image.ts";
 import { fail, notice, ok, type ToolResult } from "./result.ts";
 
 const skippedDirectories = new Set(["node_modules", ".git", "dist"]);
+const MAX_HASH_BYTES = 8 * 1024 * 1024;
+
+const fileVersion = z.union([z.string().regex(/^[a-f0-9]{64}$/), z.literal("absent")]);
 
 export const readFileInput = z.object({
   path: z.string(),
   offset: z.number().int().min(1).optional(),
   limit: z.number().int().min(1).max(2000).optional(),
+  include_hash: z.boolean().optional(),
 });
 
 export const writeFileInput = z.object({
   path: z.string(),
   contents: z.string(),
+  expected_hash: fileVersion.optional(),
 });
 
 export const editFileInput = z.object({
   path: z.string(),
   old_string: z.string().min(1),
   new_string: z.string(),
+  expected_hash: fileVersion.optional(),
 });
 
 export const globInput = z.object({
@@ -51,8 +58,14 @@ export function readFile(input: z.infer<typeof readFileInput>): ToolResult {
     const info = statSync(input.path);
     if (info.isDirectory()) return fail("is_directory", "path is a directory");
     if (imageMime(input.path)) return readImageFile(input.path);
-    if (input.offset === undefined && input.limit === undefined) return readCappedText(input.path);
-    return readLineWindow(input.path, input.offset, input.limit);
+    if (input.include_hash && info.size > MAX_HASH_BYTES) {
+      return fail("hash_too_large", "version hashing is limited to files of 8 MiB");
+    }
+    const result = input.offset === undefined && input.limit === undefined
+      ? readCappedText(input.path)
+      : readLineWindow(input.path, input.offset, input.limit);
+    if (!input.include_hash || result.isError) return result;
+    return ok(`sha256 ${hashFile(input.path)}\n${result.content[0].text}`);
   } catch (error) {
     return codeFromErrno(error);
   }
@@ -65,11 +78,20 @@ export function writeFile(input: z.infer<typeof writeFileInput>): ToolResult {
     return fail("body_too_large", `contents exceed ${WRITE_CHAR_LIMIT} characters`);
   }
   try {
-    const info = statIfExists(input.path);
-    if (info?.isDirectory()) return fail("is_directory", "path is a directory");
     mkdirSync(dirname(input.path), { recursive: true });
-    writeFileSync(input.path, input.contents, "utf8");
-    return ok(`wrote ${input.path}`);
+    return withFileLock(input.path, () => {
+      const info = fileInfo(input.path);
+      if (info?.isDirectory()) return fail("is_directory", "path is a directory");
+      if (info?.isSymbolicLink()) return fail("symlink_not_allowed", "refusing to replace a symbolic link");
+      if (input.expected_hash && input.expected_hash !== "absent" && info?.size && info.size > MAX_HASH_BYTES) {
+        return fail("hash_too_large", "version hashing is limited to files of 8 MiB");
+      }
+      if (!matchesVersion(input.path, input.expected_hash)) return fail("file_changed", "file version does not match expected_hash");
+      if (!atomicWrite(input.path, input.contents, info?.mode)) {
+        return fail("file_changed", "file changed during write");
+      }
+      return ok(`wrote ${input.path}`);
+    });
   } catch (error) {
     return codeFromErrno(error);
   }
@@ -80,15 +102,24 @@ export function editFile(input: z.infer<typeof editFileInput>): ToolResult {
   if (absolute) return absolute;
   if (input.old_string === input.new_string) return fail("edit_noop", "old_string and new_string are the same");
   try {
-    const info = statSync(input.path);
-    if (info.isDirectory()) return fail("is_directory", "path is a directory");
-    const decoded = decodeUtf8(readFileSync(input.path));
-    if (typeof decoded !== "string") return decoded;
-    const matches = countOccurrences(decoded, input.old_string);
-    if (matches === 0) return fail("edit_not_found", "old_string was not found");
-    if (matches > 1) return fail("edit_not_unique", "old_string matched more than once");
-    writeFileSync(input.path, decoded.replace(input.old_string, input.new_string), "utf8");
-    return ok(`edited ${input.path}`);
+    return withFileLock(input.path, () => {
+      const info = fileInfo(input.path);
+      if (!info) return fail("not_found", "path does not exist");
+      if (info.isDirectory()) return fail("is_directory", "path is a directory");
+      if (info.isSymbolicLink()) return fail("symlink_not_allowed", "refusing to replace a symbolic link");
+      if (input.expected_hash && input.expected_hash !== "absent" && info.size > MAX_HASH_BYTES) {
+        return fail("hash_too_large", "version hashing is limited to files of 8 MiB");
+      }
+      if (!matchesVersion(input.path, input.expected_hash)) return fail("file_changed", "file version does not match expected_hash");
+      const decoded = decodeUtf8(readFileSync(input.path));
+      if (typeof decoded !== "string") return decoded;
+      const matches = countOccurrences(decoded, input.old_string);
+      if (matches === 0) return fail("edit_not_found", "old_string was not found");
+      if (matches > 1) return fail("edit_not_unique", "old_string matched more than once");
+      const saved = atomicWrite(input.path, decoded.replace(input.old_string, input.new_string), info.mode);
+      if (!saved) return fail("file_changed", "file changed during edit");
+      return ok(`edited ${input.path}`);
+    });
   } catch (error) {
     return codeFromErrno(error);
   }
@@ -443,14 +474,76 @@ function decodeUtf8(bytes: Buffer): string | ToolResult {
   }
 }
 
-function statIfExists(path: string) {
+function fileInfo(path: string) {
   try {
-    return statSync(path);
+    return lstatSync(path);
   } catch (error) {
     if (typeof error === "object" && error !== null && "code" in error && (error as { code?: string }).code === "ENOENT") {
       return undefined;
     }
     throw error;
+  }
+}
+
+function hashFile(path: string): string {
+  if (statSync(path).size > MAX_HASH_BYTES) throw new Error("hash_too_large");
+  const hash = createHash("sha256");
+  const fd = openSync(path, "r");
+  const chunk = Buffer.alloc(64 * 1024);
+  try {
+    while (true) {
+      const size = readSync(fd, chunk, 0, chunk.length, null);
+      if (size === 0) break;
+      hash.update(chunk.subarray(0, size));
+    }
+  } finally {
+    closeSync(fd);
+  }
+  return hash.digest("hex");
+}
+
+function matchesVersion(path: string, expected?: string): boolean {
+  if (expected === undefined) return true;
+  const info = fileInfo(path);
+  if (info?.isSymbolicLink()) return false;
+  return expected === "absent" ? !info : !!info?.isFile() && hashFile(path) === expected;
+}
+
+function withFileLock(path: string, action: () => ToolResult): ToolResult {
+  const lockPath = `${path}.agent-mcp.lock`;
+  try {
+    mkdirSync(lockPath, { mode: 0o700 });
+  } catch (error) {
+    if (typeof error === "object" && error !== null && "code" in error && error.code === "EEXIST") {
+      return fail("file_busy", "another agent is editing this file; retry after it finishes");
+    }
+    return codeFromErrno(error);
+  }
+  try {
+    return action();
+  } finally {
+    rmdirSync(lockPath);
+  }
+}
+
+function atomicWrite(path: string, contents: string, mode?: number): boolean {
+  const temporary = `${path}.agent-mcp-${randomUUID()}.tmp`;
+  let fd: number | undefined;
+  try {
+    fd = openSync(temporary, "wx", 0o600);
+    writeFileSync(fd, contents, "utf8");
+    if (mode !== undefined) fchmodSync(fd, mode & 0o777);
+    fsyncSync(fd);
+    closeSync(fd);
+    fd = undefined;
+    if (fileInfo(path)?.isSymbolicLink()) return false;
+    renameSync(temporary, path);
+    return true;
+  } finally {
+    if (fd !== undefined) closeSync(fd);
+    try { unlinkSync(temporary); } catch (error) {
+      if (!(typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT")) throw error;
+    }
   }
 }
 

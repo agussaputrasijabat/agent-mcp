@@ -13,8 +13,10 @@ import { fail, ok } from "./http/json.ts";
 import { decodeCursor, getToolCall, listSessions, listToolCalls } from "./db/tool-calls.ts";
 import { dashboardPage, registerDashboard } from "./http/dashboard.ts";
 import { createHostHandler } from "./mcp/handler.ts";
+import { CuaBridge } from "./computer/bridge.ts";
+import { startSandboxCleanup } from "./computer/tools.ts";
 import { runMcpRequest } from "./mcp/request-context.ts";
-import { assertInstructions, readServerInstructions } from "./mcp/instructions.ts";
+import { assertInstructions, etagMatches, instructionModes, isInstructionMode, readInstructionPack, readServerInstructions } from "./mcp/instructions.ts";
 
 declare module "hono" {
   interface ContextVariableMap {
@@ -63,7 +65,11 @@ export async function createApp(db: Database, options: AppOptions = {}) {
   const resource = mcpResourceUrl(baseURL);
 
   const instructions = assertInstructions(options.instructions ?? readServerInstructions());
+  for (const mode of instructionModes) readInstructionPack(mode);
+  const computerBridge = new CuaBridge();
+  startSandboxCleanup(db, computerBridge);
   const handler = createHostHandler({
+    computerBridge,
     db,
     instructions,
     shellConcurrency: options.shellConcurrency,
@@ -77,6 +83,17 @@ export async function createApp(db: Database, options: AppOptions = {}) {
   app.get("/health", (c) => {
     db.query("SELECT 1 AS ok").get();
     return c.json({ data: { ok: true }, error: null });
+  });
+
+  app.get("/instructions/:file", (c) => {
+    const match = /^([a-z]+)\.md$/.exec(c.req.param("file"));
+    const mode = match?.[1];
+    if (!mode || !isInstructionMode(mode)) return c.text("Not found", 404);
+    const pack = readInstructionPack(mode);
+    const etag = `"${pack.version}"`;
+    const headers = { etag, "cache-control": "no-cache", "x-content-type-options": "nosniff" };
+    if (etagMatches(c.req.header("if-none-match"), etag)) return c.body(null, 304, headers);
+    return c.body(pack.text, 200, { ...headers, "content-type": "text/markdown; charset=utf-8" });
   });
 
   app.get("/login", () => dashboardPage());
@@ -217,7 +234,7 @@ export async function createApp(db: Database, options: AppOptions = {}) {
     );
   });
 
-  registerDashboard(app, db, operator);
+  registerDashboard(app, db, operator, computerBridge);
 
   return Object.assign(app, { auth });
 }

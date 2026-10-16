@@ -15,16 +15,17 @@ export type Settings = {
 };
 
 const settingsCache = new WeakMap<Database, Settings>();
+const selectSettings = "SELECT public_base_url, shell_concurrency_limit, shell_timeout_ms, shell_timeout_max_ms, output_char_limit FROM settings WHERE id = 1";
 
 function querySettings(db: Database): Settings {
-  const row = db.query("SELECT * FROM settings WHERE id = 1").get() as Settings | null;
+  const row = db.query(selectSettings).get() as Settings | null;
   if (!row) throw new Error("settings_missing");
   settingsCache.set(db, row);
   return row;
 }
 
 export function ensureSettings(db: Database, publicBaseUrl: string): Settings {
-  const existing = db.query("SELECT * FROM settings WHERE id = 1").get() as Settings | null;
+  const existing = db.query(selectSettings).get() as Settings | null;
   if (existing) {
     settingsCache.set(db, existing);
     return existing;

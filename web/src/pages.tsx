@@ -327,6 +327,9 @@ export function SettingsPage() {
                 <FieldLabel htmlFor="shell-timeout-max">Timeout maksimum</FieldLabel>
                 <Input id="shell-timeout-max" min={1} type="number" value={form.shell_timeout_max_ms} onChange={(event) => setForm({ ...form, shell_timeout_max_ms: Number(event.target.value) })} />
               </Field>
+              <p className="md:col-span-3 text-xs leading-5 text-muted-foreground">
+                Konfirmasi penggunaan tool dikelola oleh ChatGPT atau Claude. Atur izin tool di aplikasi klien.
+              </p>
               <div className="flex flex-col items-start gap-3 md:col-span-3">
                 <Button type="submit">Simpan perubahan</Button>
                 {saved ? <p className="text-sm text-primary" role="status">Pengaturan berhasil disimpan.</p> : null}
@@ -411,9 +414,10 @@ export function MemoriesPage() {
     load();
   }
 
-  async function remove(memoryKey: string) {
+  async function remove(row: MemoryRow) {
     if (!window.confirm("Hapus memori ini secara permanen?")) return;
-    const result = await api<{ ok: boolean }>(`/api/memories/${encodeURIComponent(memoryKey)}`, { method: "DELETE" });
+    const scope = row.project_path ? `?project_path=${encodeURIComponent(row.project_path)}` : "";
+    const result = await api<{ ok: boolean }>(`/api/memories/${encodeURIComponent(row.key)}${scope}`, { method: "DELETE" });
     if (!result.ok) {
       setMessage(result.message);
       return;
@@ -469,12 +473,12 @@ export function MemoriesPage() {
               </TableHeader>
               <TableBody>
                 {rows.map((row) => (
-                  <TableRow key={row.key}>
+                  <TableRow key={`${row.project_path ?? ""}:${row.key}`}>
                     <TableCell>{row.key}</TableCell>
                     <TableCell className="max-w-40 truncate text-muted-foreground">{row.project_path ?? ""}</TableCell>
                     <TableCell className="max-w-64 truncate text-muted-foreground">{row.body.slice(0, 120)}</TableCell>
                     <TableCell>
-                      <Button type="button" variant="destructive" size="sm" onClick={() => void remove(row.key)}>Hapus</Button>
+                      <Button type="button" variant="destructive" size="sm" onClick={() => void remove(row)}>Hapus</Button>
                     </TableCell>
                   </TableRow>
                 ))}

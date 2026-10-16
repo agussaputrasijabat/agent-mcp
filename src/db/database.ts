@@ -43,7 +43,9 @@ function applyMigrations(db: Database): void {
   for (const file of files) {
     const migrationId = file.slice("migrations/".length);
     if (appliedIds.has(migrationId) || appliedIds.has(file)) continue;
-    db.exec(resourceText(file));
-    insert.run(migrationId, new Date().toISOString());
+    db.transaction(() => {
+      db.exec(resourceText(file));
+      insert.run(migrationId, new Date().toISOString());
+    })();
   }
 }

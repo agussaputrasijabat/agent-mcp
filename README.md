@@ -12,10 +12,11 @@ Server ini **bukan** CLI, IDE, atau model AI. ChatGPT atau Claude memilih tool; 
 
 ## Apa yang bisa dilakukan?
 
-- **Bekerja dengan kode:** membaca, membuat, dan mengedit file; mencari path atau teks; menjalankan perintah shell, Git, build, dan tes.
+- **Bekerja dengan kode:** membaca, membuat, dan mengedit file dengan penulisan atomik dan pemeriksaan versi opsional; mencari path atau teks; menjalankan perintah shell, Git, build, dan tes.
 - **Menyimpan konteks:** memori lintas percakapan dan skill yang bisa digunakan kembali. Skill dalam repository juga dapat dibaca tanpa disalin ke database.
 - **Memantau aktivitas:** dashboard untuk feed panggilan tool, riwayat sesi, klien, API key, memori, skill, dan pengaturan.
 - **Terhubung secara remote:** endpoint MCP Streamable HTTP dengan API key atau OAuth, untuk penggunaan lokal maupun server publik.
+- **Computer Use (opsional):** kendalikan window desktop melalui Cua Driver, atau kelola sandbox Linux lokal melalui Cua CLI. Kedua akses default-nya nonaktif. [Panduan Computer Use](docs/computer-use.md).
 
 ### Cara kerjanya
 
@@ -27,7 +28,7 @@ flowchart LR
     B --> E[("SQLite: sesi, audit, memori, skill")]
 ```
 
-Tool berjalan dengan **izin akun sistem operasi yang menjalankan server**, bukan di sandbox folder proyek. Baca [model keamanan](docs/security.md) sebelum membuka server ke internet.
+Tool berjalan dengan **izin akun sistem operasi yang menjalankan server**, bukan di sandbox folder proyek. Konfirmasi pemanggilan tool ditangani oleh **ChatGPT atau Claude** sesuai pengaturan izin klien—tidak perlu approval tambahan di dashboard. Karena dialog tidak selalu dijamin muncul, gunakan izin klien dan akun OS yang ketat. Baca [model keamanan](docs/security.md) sebelum membuka server ke internet.
 
 ## Mulai cepat
 
@@ -102,7 +103,7 @@ Panduan lengkap: [instalasi dan deployment](docs/run.md) serta [konfigurasi](doc
 1. Jalankan Agent MCP di host dan tentukan apakah akan memakai **tunnel** atau **URL HTTPS publik**.
 2. Pilih autentikasi. **OAuth** menggunakan alur login dan consent operator. **API key** dibuat di menu **Kunci** dan hanya ditampilkan satu kali.
 3. Tambahkan server di klien MCP yang mendukung metode koneksi tersebut. Untuk koneksi berbasis URL, gunakan `https://domain-kamu/mcp`.
-4. Buka **Setup** di dashboard. Masukkan path absolut repository pada host dan nama konektor, lalu salin instruksi yang dihasilkan ke instruksi proyek ChatGPT atau Claude.
+4. Buka **Setup** di dashboard. Pilih mode Coding atau Non-coding, masukkan nama konektor dan path absolut repository pada host, lalu salin teks pendek yang dihasilkan ke instruksi proyek ChatGPT atau Claude. Instruksi lengkap diambil model lewat tool `get_instructions`, jadi update server tidak perlu mengedit ulang proyek.
 5. Minta klien menjalankan tool sederhana seperti `glob` atau `read_file`, kemudian periksa hasilnya di **Feed**.
 
 Detail per klien, cara mengirim API key, OAuth, dan tunnel: [docs/clients.md](docs/clients.md).
@@ -113,12 +114,18 @@ Detail per klien, cara mengirim API key, OAuth, dan tunnel: [docs/clients.md](do
 | --- | --- | --- |
 | File | `read_file`, `write_file`, `edit_file` | Baca, buat, atau ubah file |
 | Pencarian | `glob`, `grep` | Cari file atau teks |
-| Eksekusi | `shell` | Jalankan perintah Bash di host |
+| Eksekusi | `shell`, `start_process`, `read_process_output`, `write_process_input`, `list_processes`, `terminate_process`, `execute_code` | Terminal, sesi proses, dan eksekusi kode tanpa file |
+| Direktori | `list_directory`, `create_directory`, `move_path`, `stat_path` | Kelola direktori dan metadata |
+| Analisis | `analyze_data` | Profil data CSV, JSON, dan workbook |
+| Excel | `read_spreadsheet`, `create_spreadsheet`, `edit_spreadsheet`, `search_spreadsheet` | Baca, buat, ubah, dan cari XLSX |
+| PDF | `read_pdf`, `create_pdf`, `edit_pdf` | Ekstraksi dan operasi dasar PDF |
+| DOCX | `read_docx`, `create_docx`, `edit_docx`, `search_docx` | Baca, buat, edit teks, cari dokumen Word |
+| Preview | `preview_file`, `open_in_folder` | MCP Apps file preview dan buka lokasi pada host |
 | HTTP | `web_fetch` | Ambil URL dari host MCP |
 | Memori | `memory_search`, `memory_save`, `memory_forget` | Cari, simpan, atau hapus catatan |
 | Skill | `skill_list`, `skill_read`, `skill_save`, `skill_delete` | Kelola prosedur yang bisa dipakai ulang |
 
-Total **14 tool**. `read_file` juga dapat menampilkan berkas gambar yang didukung. `skill_list` bisa menemukan skill di `.agents/skills`, `.claude/skills`, `.codex/skills`, dan `.opencode/commands` bila diberi `project_path`.
+Total **38 tool**. `read_file` juga dapat menampilkan berkas gambar yang didukung. Preview interaktif memerlukan klien yang mendukung **MCP Apps**; klien lain tetap menerima hasil teks/gambar biasa. Dukungan `.xls` binary belum tersedia, dan `.xlsm` hanya dapat dibaca (penulisan dinonaktifkan agar macro tidak hilang). PDF Markdown menggunakan font Latin-1; pengeditan DOCX dibatasi pada teks dalam satu XML run. `skill_list` bisa menemukan skill di `.agents/skills`, `.claude/skills`, `.codex/skills`, dan `.opencode/commands` bila diberi `project_path`.
 
 Agent MCP **tidak menyediakan `web_search`**. Gunakan pencarian web bawaan klien untuk pencarian umum. [Referensi lengkap setiap tool](docs/tools.md).
 

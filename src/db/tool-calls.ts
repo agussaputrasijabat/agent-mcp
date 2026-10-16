@@ -1,5 +1,7 @@
+import { createHash } from "node:crypto";
 import type { Database } from "bun:sqlite";
 import { currentMcpRequest } from "../mcp/request-context.ts";
+import { sensitivePath } from "../security/sensitive-path.ts";
 import { truncate } from "../tools/result.ts";
 
 const clientInfoKey = "io.modelcontextprotocol/clientInfo";
@@ -49,6 +51,26 @@ export function beginToolCall(db: Database, input: {
   const id = crypto.randomUUID();
   const client = readClient(input.ctx);
   const secrets = redactSecrets(call?.request, call?.credential ?? "");
+  const argumentsCopy = redactValue(input.args ?? {}, secrets) as Record<string, unknown>;
+  if (input.toolName === "computer_driver" || input.toolName === "computer_sandbox") {
+    // Computer observations, typed text, screenshots and sandbox arguments can contain private data.
+    argumentsCopy.parameters = "[redacted]";
+  }
+  if (["shell", "start_process", "execute_code"].includes(input.toolName)) {
+    const field = input.toolName === "execute_code" ? "code" : "command";
+    if (typeof argumentsCopy[field] === "string") {
+      argumentsCopy[field] = `SHA-256: ${createHash("sha256").update(argumentsCopy[field]).digest("hex")} (${input.toolName === "shell" ? "command" : "source"} omitted)`;
+    }
+  }
+  for (const field of ["input", "markdown", "cells", "rows", "old_string", "new_string"]) {
+    if (field in argumentsCopy) argumentsCopy[field] = "[redacted]";
+  }
+  if ((input.toolName === "write_file" || input.toolName === "edit_file") &&
+      typeof argumentsCopy.path === "string" && sensitivePath(argumentsCopy.path)) {
+    if ("contents" in argumentsCopy) argumentsCopy.contents = "[redacted]";
+    if ("old_string" in argumentsCopy) argumentsCopy.old_string = "[redacted]";
+    if ("new_string" in argumentsCopy) argumentsCopy.new_string = "[redacted]";
+  }
   db.query(
     `INSERT INTO tool_calls (
       id, started_at, finished_at, duration_ms, tool_name, arguments_json, result_text, is_error, error_code,
@@ -58,7 +80,7 @@ export function beginToolCall(db: Database, input: {
     id,
     now.toISOString(),
     input.toolName,
-    JSON.stringify(redactValue(input.args ?? {}, secrets)),
+    JSON.stringify(argumentsCopy),
     client.name,
     client.version,
     call?.authKind ?? "api_key",
@@ -68,13 +90,14 @@ export function beginToolCall(db: Database, input: {
   return id;
 }
 
-export function finishToolCall(db: Database, id: string, result: { content?: { type?: string; text?: string }[]; isError?: boolean }, durationMs: number, now = new Date()): void {
-  const text = storeText(
-    (result.content ?? [])
-      .filter((item) => item.type !== "image")
-      .map((item) => item.text ?? "")
-      .join("\n"),
-  );
+export function finishToolCall(db: Database, id: string, result: { content?: { type?: string; text?: string }[]; isError?: boolean }, durationMs: number, now = new Date(), omitResult = false): void {
+  const call = currentMcpRequest();
+  const secrets = redactSecrets(call?.request, call?.credential ?? "");
+  const output = (result.content ?? [])
+    .filter((item) => item.type !== "image")
+    .map((item) => item.text ?? "")
+    .join("\n");
+  const text = omitResult ? "[redacted: sensitive file]" : storeText(redactString(output, secrets));
   const isError = result.isError === true;
   db.query(
     `UPDATE tool_calls

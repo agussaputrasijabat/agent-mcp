@@ -2,6 +2,7 @@ import { statSync } from "node:fs";
 import * as z from "zod/v4";
 import {
   COMMAND_CHAR_LIMIT,
+  OUTPUT_CHAR_LIMIT,
   SHELL_CONCURRENCY,
   SHELL_TIMEOUT_MAX_MS,
   SHELL_TIMEOUT_MIN_MS,
@@ -9,6 +10,30 @@ import {
 } from "../limits.ts";
 import { requireAbsolute } from "./paths.ts";
 import { fail, ok, type ToolResult } from "./result.ts";
+
+async function readBounded(stream: ReadableStream<Uint8Array>): Promise<string> {
+  const reader = stream.getReader();
+  const decoder = new TextDecoder();
+  let content = "";
+  let truncated = false;
+  try {
+    while (true) {
+      const next = await reader.read();
+      if (next.done) break;
+      const text = decoder.decode(next.value, { stream: true });
+      const remaining = OUTPUT_CHAR_LIMIT - content.length;
+      if (text.length > remaining) truncated = true;
+      if (remaining > 0) content += text.slice(0, remaining);
+    }
+    const final = decoder.decode();
+    const remaining = OUTPUT_CHAR_LIMIT - content.length;
+    if (final.length > remaining) truncated = true;
+    if (remaining > 0) content += final.slice(0, remaining);
+    return truncated ? `${content}\n[truncated]` : content;
+  } finally {
+    reader.releaseLock();
+  }
+}
 
 export const shellInput = z.object({
   command: z.string(),
@@ -72,20 +97,36 @@ export async function runShell(
       cwd,
       stdout: "pipe",
       stderr: "pipe",
+      detached: process.platform !== "win32",
     });
     let timedOut = false;
+    let completed = false;
+    let forceTimer: ReturnType<typeof setTimeout> | undefined;
+    const stop = (signal: NodeJS.Signals) => {
+      if (process.platform !== "win32" && proc.pid) {
+        try { process.kill(-proc.pid, signal); return; } catch { /* process group exited */ }
+      }
+      try { proc.kill(signal); } catch { /* process exited */ }
+    };
     const timer = setTimeout(() => {
+      if (completed) return;
       timedOut = true;
-      proc.kill();
+      stop("SIGTERM");
+      forceTimer = setTimeout(() => { if (!completed) stop("SIGKILL"); }, 750);
     }, timeoutMs);
-    const stdoutPromise = new Response(proc.stdout).text();
-    const stderrPromise = new Response(proc.stderr).text();
-    const exitCode = await proc.exited;
-    clearTimeout(timer);
-    const stdout = await stdoutPromise;
-    const stderr = await stderrPromise;
-    if (timedOut) return fail("shell_timeout", `command exceeded ${timeoutMs}ms`);
-    return ok(`exit code ${exitCode}\n${stdout}${stderr ? `stderr:\n${stderr}` : ""}`);
+    const stdoutPromise = readBounded(proc.stdout);
+    const stderrPromise = readBounded(proc.stderr);
+    try {
+      const exitCode = await proc.exited;
+      const [stdout, stderr] = await Promise.all([stdoutPromise, stderrPromise]);
+      if (timedOut) return fail("shell_timeout", `command exceeded ${timeoutMs}ms`);
+      return ok(`exit code ${exitCode}\n${stdout}${stderr ? `stderr:\n${stderr}` : ""}`);
+    } finally {
+      completed = true;
+      clearTimeout(timer);
+      if (forceTimer) clearTimeout(forceTimer);
+      if (timedOut) stop("SIGKILL");
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : "failed to start bash";
     console.error(JSON.stringify({ level: "error", msg: "shell_spawn_failed", message }));

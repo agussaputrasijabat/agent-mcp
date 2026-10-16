@@ -68,11 +68,25 @@ Tambahkan koneksi Tunnel di ChatGPT menggunakan `tunnel_id` yang sama. Ini tidak
 Setelah konektor berhasil dibuat:
 
 1. Buka halaman **Setup** (`/setup`) pada dashboard.
-2. Masukkan **path absolut folder proyek di host**. Contoh: `/Users/operator/Repository/my-app`.
+2. Pilih mode **Coding** (kerja di repo) atau **Non-coding** (dokumen, spreadsheet, riset, olah data).
 3. Masukkan **nama MCP** persis seperti yang digunakan saat membuat konektor.
-4. Salin instruksi yang dihasilkan ke custom instructions proyek ChatGPT atau Claude.
+4. Masukkan **path absolut folder proyek di host**. Contoh: `/Users/operator/Repository/my-app`. Untuk Non-coding, path boleh kosong.
+5. Opsional: isi catatan proyek, misalnya perintah tes atau gaya penulisan.
+6. Salin teks yang dihasilkan ke custom instructions proyek ChatGPT atau Claude. Penghitung karakter menjaga teks di bawah batas 8.000 karakter ChatGPT.
 
-Template sumber tersedia di [`prompts/project-instructions.md`](../prompts/project-instructions.md). Path proyek membantu AI menentukan lokasi file; ini bukan sandbox atau pembatas akses.
+Teks yang ditempel hanya berisi nama konektor, folder, mode, dan catatan (template: [`prompts/project-stub.md`](../prompts/project-stub.md)). Teks itu menyuruh model memanggil tool `get_instructions` di awal tiap chat. Tool tersebut mengembalikan instruksi lengkap dari [`prompts/packs/`](../prompts/packs/) sesuai versi server yang sedang jalan, jadi update agent-mcp tidak perlu mengedit ulang proyek. Tempel ulang hanya kalau nama MCP, path, mode, atau catatan berubah.
+
+Kalau tool tidak tersedia, model diarahkan membuka URL cadangan `PUBLIC_BASE_URL/instructions/<mode>.md`. URL ini publik tanpa login karena isinya generik dan tidak memuat path, nama, atau kunci. URL cadangan hanya berguna kalau origin bisa dijangkau dari internet.
+
+Kenapa tidak memakai field `instructions` MCP saja: Claude.ai web tidak memasukkan field itu ke konteks model (anthropics/claude-ai-mcp#93), dan ChatGPT hanya memakai 512 karakter pertama. Field itu tetap diisi dan menunjuk ke `get_instructions`.
+
+Path proyek membantu AI menentukan lokasi file; ini bukan sandbox atau pembatas akses.
+
+## Konfirmasi tool langsung di ChatGPT atau Claude
+
+Server tidak meminta persetujuan dari halaman dashboard. Tool yang bisa mengubah data, terutama `shell`, `write_file`, `edit_file`, `memory_forget`, dan `skill_delete`, diberi anotasi MCP sebagai tindakan berpotensi destruktif. Jika klien menampilkan dialog izin pemanggilan tool, tinjau argumen lalu pilih izinkan atau tolak **di aplikasi klien**. Tidak ada langkah ulang dengan `approval_id`.
+
+ChatGPT menentukan permintaan konfirmasi berdasarkan izin aplikasi dan konteks; Claude juga dapat mengatur izin per tool. Perilakunya tidak selalu sama dan tidak bisa dipaksakan oleh server hanya melalui anotasi. Hindari pengaturan "selalu izinkan" bila menghubungkan host berisi data sensitif, dan jalankan server menggunakan akun OS dengan hak akses minimal.
 
 ## Uji koneksi
 

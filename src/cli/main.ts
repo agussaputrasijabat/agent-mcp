@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { computerDiagnostics } from "../computer/bridge.ts";
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createInterface } from "node:readline/promises";
@@ -244,13 +245,17 @@ async function autostartCommand(): Promise<void> {
 async function main(): Promise<void> {
   if (command === "__serve") return runServer();
   if (command === "--help" || command === "help") {
-    console.log(`agent-mcp [start|stop|restart|status|logs|open|setup|config|autostart|auth reset-password|--foreground|--version]\nPort instalasi baru: ${DEFAULT_CLI_PORT} (fallback otomatis jika terpakai)`);
+    console.log(`agent-mcp [start|stop|restart|status|logs|open|setup|config|computer doctor|autostart|auth reset-password|--foreground|--version]\nPort instalasi baru: ${DEFAULT_CLI_PORT} (fallback otomatis jika terpakai)`);
     return;
   }
   if (command === "--version" || command === "version") { console.log("agent-mcp 1.0.0"); return; }
   if (command === "setup") { await setup(); return; }
   if (command === "config") return configCommand();
   if (command === "autostart") return autostartCommand();
+  if (command === "computer" && process.argv[3] === "doctor") {
+    console.log(JSON.stringify({ runtimes: computerDiagnostics(), note: "This checks binary installation only; desktop daemon permissions require cua-driver doctor and a bounded manifest." }, null, 2));
+    return;
+  }
   if (command === "auth" && process.argv[3] === "reset-password") return resetPassword();
   if (command === "start") return start();
   if (command === "stop") return stop();
