@@ -26,7 +26,6 @@ async function healthy(config: CliConfig): Promise<boolean> {
 
 async function passwordPrompt(label = "Password operator (minimal 12 karakter)"): Promise<string> {
   if (!process.stdin.isTTY) throw new Error("setup_requires_terminal");
-  process.stdout.write(`${label}: `);
   process.stdin.setRawMode(true);
   let result = "";
   let onData: (chunk: Buffer) => void;
@@ -49,6 +48,7 @@ async function passwordPrompt(label = "Password operator (minimal 12 karakter)")
       process.stdin.once("error", onError);
       process.stdin.resume();
       process.stdin.ref();
+      process.stdout.write(`${label}: `);
     });
   } finally {
     process.stdin.off("data", onData!);
