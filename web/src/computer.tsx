@@ -124,7 +124,7 @@ export function ComputerPage() {
         <CardContent className="grid gap-6 p-6 md:grid-cols-[minmax(0,1fr)_minmax(15rem,.8fr)] md:p-7">
           <div>
             <h3 className="text-base font-semibold tracking-tight">Sebelum mengaktifkan akses</h3>
-            <p className="mt-2 max-w-[65ch] text-sm leading-7 text-muted-foreground">Pastikan Cua Driver berjalan dengan permission mode <code className="rounded bg-muted px-1.5 py-0.5 text-foreground">bounded</code> dan capability manifest yang hanya memperbolehkan aplikasi yang kamu pilih. Di macOS, jalankan daemon melalui CuaDriver.app agar izin Accessibility dan Screen Recording teratribusi dengan benar.</p>
+            <p className="mt-2 max-w-[65ch] text-sm leading-7 text-muted-foreground">Gunakan permission mode <code className="rounded bg-muted px-1.5 py-0.5 text-foreground">standard</code> untuk penggunaan lokal dengan pengawasan operator, atau <code className="rounded bg-muted px-1.5 py-0.5 text-foreground">bounded</code> dengan capability manifest untuk pembatasan ketat. Mode unrestricted dan bypass ditolak. Proses Cua Driver langsung membutuhkan izin macOS Accessibility dan Screen Recording sendiri.</p>
             <a className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline" href="https://cua.ai/docs/cua-driver/guides/permissions" target="_blank" rel="noopener noreferrer">
               Panduan permissions resmi <ArrowSquareOut size={16} />
             </a>

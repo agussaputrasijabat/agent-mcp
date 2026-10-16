@@ -68,9 +68,9 @@ export async function computerDriver(db: Database, bridge: CuaBridge, input: z.i
   const settings = computerSettings(db);
   const read = hostReads.has(input.action);
   if (!settings.driver_observe || (!read && !settings.driver_control)) return fail("computer_disabled", "Enable the required Cua Driver permission in Computer settings");
-  const driver = computerDiagnostics().driver as { compatible?: boolean; bounded?: boolean };
+  const driver = computerDiagnostics().driver as { compatible?: boolean; configured?: boolean };
   if (!driver.compatible) return fail("driver_outdated", "Cua Driver 0.28 or newer is required");
-  if (!driver.bounded) return fail("driver_unbounded", "An approved bounded Cua Driver manifest and app allowlist are required");
+  if (!driver.configured) return fail("driver_mode_invalid", "Set CUA_DRIVER_PERMISSION_MODE to standard or bounded with its required configuration; unrestricted is prohibited");
   const caller = principal();
   if (!caller) return fail("unauthorized", "Authenticated MCP context required");
   const error = validateHostAction(input.action, input.parameters);

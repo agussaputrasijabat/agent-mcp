@@ -36,6 +36,23 @@ export function allowedApps(): Set<string> {
   return new Set(values);
 }
 
+export type DriverPermissionMode = "standard" | "bounded";
+
+export function driverPermissionEnvironment(): Record<string, string> {
+  const mode = process.env.CUA_DRIVER_PERMISSION_MODE;
+  if (process.env.CUA_DRIVER_DANGEROUSLY_BYPASS_APPROVALS === "1") {
+    throw new Error("Cua Driver dangerously-bypass approvals is disabled by Agent MCP");
+  }
+  if (mode === "standard") {
+    return {
+      CUA_DRIVER_PERMISSION_MODE: "standard",
+      CUA_DRIVER_DANGEROUSLY_BYPASS_APPROVALS: "0",
+    };
+  }
+  if (mode === "bounded") return boundedDriverEnvironment();
+  throw new Error("Set CUA_DRIVER_PERMISSION_MODE to standard or bounded; unrestricted is prohibited");
+}
+
 export function boundedDriverEnvironment(): Record<string, string> {
   const manifest = process.env.CUA_DRIVER_CAPABILITY_MANIFEST_FILE;
   if (process.env.CUA_DRIVER_PERMISSION_MODE !== "bounded" ||
@@ -93,11 +110,14 @@ export function computerDiagnostics() {
     }
     const parsed = provider === "driver" ? /\b(\d+)\.(\d+)\.(\d+)/.exec(version ?? "") : null;
     const compatible = provider === "driver" ? !!parsed && (Number(parsed[1]) > 0 || Number(parsed[2]) >= 28) : !!version;
-    let bounded = false;
+    let permissionMode: DriverPermissionMode | null = null;
     if (provider === "driver") {
-      try { boundedDriverEnvironment(); bounded = true; } catch { /* unconfigured */ }
+      try {
+        driverPermissionEnvironment();
+        permissionMode = process.env.CUA_DRIVER_PERMISSION_MODE as DriverPermissionMode;
+      } catch { /* permission policy missing or invalid */ }
     }
-    return [provider, { installed: !!path, version, compatible, bounded }];
+    return [provider, { installed: !!path, version, compatible, permissionMode, configured: provider === "driver" ? permissionMode !== null : true }];
   }));
 }
 
@@ -154,7 +174,7 @@ export class CuaBridge {
         ? ["mcp", "--direct"]
         : ["mcp", "--permissions", "sandbox:list,sandbox:get,sandbox:create,sandbox:start,sandbox:stop,sandbox:delete,images:list,computer:screenshot,computer:click,computer:type,computer:key,computer:scroll"];
       const env = getDefaultEnvironment();
-      if (provider === "driver") Object.assign(env, boundedDriverEnvironment());
+      if (provider === "driver") Object.assign(env, driverPermissionEnvironment());
       const transport = new StdioClientTransport({ command: binary, args: params, env, stderr: "ignore", maxBufferSize: 12 * 1024 * 1024 });
       const client = new Client({ name: "agent-mcp-cua", version: "1.0.0" });
       try {

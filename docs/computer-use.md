@@ -27,9 +27,19 @@ agent-mcp computer doctor
 
 The adapter requires **Cua Driver 0.28 or newer**. Older driver versions, including 0.17.0, are explicitly rejected. The diagnostic only checks installed binaries and version compatibility. An installed Cua Driver is **not** proof that its daemon is running or has Accessibility / Screen Recording permission.
 
-The integration launches `cua-driver mcp --direct` with its **own bounded runtime** on every OS. On macOS this uses the CLI process for TCC attribution, not CuaDriver.app's existing daemon. Grant Accessibility and Screen Recording to that process when prompted by the OS; otherwise desktop use will fail closed.
+The integration launches `cua-driver mcp --direct`, making the CLI process the runtime owner on every OS. On macOS, **the CLI process requires its own Accessibility and Screen Recording permissions**; the existing CuaDriver.app daemon's grants are not automatically reused.
 
-Configure the **Agent MCP server process environment** (not a remotely submitted tool argument):
+Configure the **Agent MCP server process environment** (not an MCP tool argument):
+
+```sh
+# Standard mode, suitable for operator-supervised use:
+CUA_DRIVER_PERMISSION_MODE=standard
+CUA_DRIVER_ALLOWED_APPS=ru.keepcoder.Telegram
+```
+
+`standard` follows Cua Driver's normal permission checks. It is **not unrestricted**; no dangerous bypass is requested or permitted. Agent MCP still enforces its own exact-window action schemas, tool allowlist, and approved `launch_app` bundle IDs. In standard mode, a capability manifest is optional.
+
+For unattended, narrower-scope usage, continue to use **bounded** mode:
 
 ```sh
 CUA_DRIVER_PERMISSION_MODE=bounded
@@ -38,9 +48,9 @@ CUA_DRIVER_CAPABILITY_MANIFEST_APPROVED=1
 CUA_DRIVER_ALLOWED_APPS=com.example.Editor
 ```
 
-The manifest must be a regular file owned by the server user, not writable by other accounts; version 3 with `expires_after` and `idle_timeout`, an exact `resources.apps` list equal to the configured allowlist, and `resources.desktop.display: false`. It must not grant files, browser resources, arbitrary scripts, or tools outside the adapter's allowlist. Example resource policy: [Cua bounded mode](https://cua.ai/docs/cua-driver/guides/permissions).
+The bounded manifest must be a regular file owned by the server user, not writable by others; version 3 with `expires_after` and `idle_timeout`, an exact `resources.apps` list matching the allowlist, and `resources.desktop.display: false`. It must not grant files, browser resources, arbitrary scripts, or tools outside the adapter's allowlist. See [Cua permissions](https://cua.ai/docs/cua-driver/guides/permissions).
 
-**Note:** An unrelated daemon configured in `standard` mode is not considered a trusted authorization boundary by this integration; it is never reused.
+`CUA_DRIVER_PERMISSION_MODE=unrestricted` and `CUA_DRIVER_DANGEROUSLY_BYPASS_APPROVALS=1` are **always rejected** by Agent MCP.
 
 ## Enable from the dashboard
 

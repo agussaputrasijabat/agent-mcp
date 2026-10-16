@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { openDatabase } from "../src/db/database.ts";
-import { CuaBridge, boundedDriverEnvironment } from "../src/computer/bridge.ts";
+import { CuaBridge, boundedDriverEnvironment, driverPermissionEnvironment, computerDiagnostics } from "../src/computer/bridge.ts";
 import { reserveSandbox, expiredSandboxes } from "../src/computer/ownership.ts";
 import { sandboxOwned, ownSandbox, forgetSandbox } from "../src/computer/ownership.ts";
 import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -99,6 +99,32 @@ test("sandbox quotas are enforced and expired leases are discoverable", () => {
   );
   expect(expiredSandboxes(db).some((entry) => entry.name === "local:a")).toBe(true);
   db.close();
+});
+
+test("driver permission mode is explicit and unrestricted or bypass always fail closed", () => {
+  const keys = ["CUA_DRIVER_PERMISSION_MODE", "CUA_DRIVER_DANGEROUSLY_BYPASS_APPROVALS", "CUA_DRIVER_CAPABILITY_MANIFEST_FILE", "CUA_DRIVER_ALLOWED_APPS"];
+  const old = keys.map((key) => process.env[key]);
+  try {
+    delete process.env.CUA_DRIVER_PERMISSION_MODE;
+    delete process.env.CUA_DRIVER_DANGEROUSLY_BYPASS_APPROVALS;
+    expect(() => driverPermissionEnvironment()).toThrow("standard or bounded");
+    process.env.CUA_DRIVER_PERMISSION_MODE = "standard";
+    const env = driverPermissionEnvironment();
+    expect(env.CUA_DRIVER_PERMISSION_MODE).toBe("standard");
+    expect(env.CUA_DRIVER_DANGEROUSLY_BYPASS_APPROVALS).toBe("0");
+    expect(computerDiagnostics().driver?.permissionMode).toBe("standard");
+    process.env.CUA_DRIVER_DANGEROUSLY_BYPASS_APPROVALS = "1";
+    expect(() => driverPermissionEnvironment()).toThrow("dangerously-bypass");
+    delete process.env.CUA_DRIVER_DANGEROUSLY_BYPASS_APPROVALS;
+    process.env.CUA_DRIVER_PERMISSION_MODE = "unrestricted";
+    expect(() => driverPermissionEnvironment()).toThrow("unrestricted");
+    expect(computerDiagnostics().driver?.configured).toBe(false);
+  } finally {
+    keys.forEach((key, index) => {
+      if (old[index] === undefined) delete process.env[key];
+      else process.env[key] = old[index];
+    });
+  }
 });
 
 test("bounded driver requires a trusted policy and allowed apps", () => {
